@@ -823,6 +823,12 @@ class Shotgun(object):
             raise ShotgunError("%s is not a valid filter operator" % filter_operator)
 
     def _update_row(self, entity_type, row, data, multi_entity_update_modes=None):
+        """For a given row of the 'database', update the row with the given data.
+        
+        :param str entity_type: shotgun entity.
+        :param dict row: current definition of the row.
+        :param dict data: data to inject in the row.
+        """
         for field in data:
             field_type = self._get_field_type(entity_type, field)
             if field_type == "entity" and data[field]:
