@@ -14,15 +14,19 @@ if (sys.version_info[0] <= 2) or (sys.version_info[0] == 2 and sys.version_info[
     if 'install' in script_args and '--no-compile' not in script_args:
         script_args.append('--no-compile')
 
+# version of the library was into when the fork was done
+shotgun_software_version='3.0.32'
+# versionning of the rodeo internal updates
+rodeo_version='rdo.1.0.0'
 
 setup(
     name='shotgun_api3',
-    version='3.0.32',
-    description='Shotgun Python API ',
+    version='-'.join([shotgun_software_version, rodeo_version]),
+    description='Shotgun Python API: RodeoFX specifications',
     long_description=readme,
-    author='Shotgun Software',
-    author_email='support@shotgunsoftware.com',
-    url='https://github.com/shotgunsoftware/python-api',
+    author='Shotgun Software, RodeoFX',
+    author_email='shotgundev@rodeofx.com',
+    url='https://github.com/rodeofx/python-api',
     license=license,
     packages=find_packages(exclude=('tests',)),
     script_args=script_args,
