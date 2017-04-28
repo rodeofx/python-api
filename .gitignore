@@ -32,3 +32,5 @@ dist
 shotgun_api3.egg-info
 /%1
 
+# pycharm
+.idea
