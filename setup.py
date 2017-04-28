@@ -17,7 +17,7 @@ if (sys.version_info[0] <= 2) or (sys.version_info[0] == 2 and sys.version_info[
 # version of the library was into when the fork was done
 shotgun_software_version='3.0.32'
 # versionning of the rodeo internal updates
-rodeo_version='1.0.0'
+rodeo_version='1.1.0'
 
 setup(
     name='shotgun_api3',
