@@ -26,14 +26,9 @@ if (sys.version_info[0] <= 2) or (
     if "install" in script_args and "--no-compile" not in script_args:
         script_args.append("--no-compile")
 
-# version of the library was into when the fork was done
-shotgun_software_version = "3.0.32"
-# versionning of the rodeo internal updates
-rodeo_version = "1.1.0"
-
 setup(
     name="shotgun_api3",
-    version="-rdo-".join([shotgun_software_version, rodeo_version]),
+    version="3.0.32",
     description="Shotgun Python API: RodeoFX specifications",
     long_description=readme,
     author="Shotgun Software, RodeoFX",
