@@ -502,6 +502,7 @@ class Shotgun(object):
                     sg_type = field_info["data_type"]["value"]
                     python_type = {"number": int,
                                    "float": float,
+                                   "currency": float,
                                    "checkbox": bool,
                                    "percent": int,
                                    "text": str,
