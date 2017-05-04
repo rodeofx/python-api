@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+raise DeprecationWarning('Use rez-build to build this package at Rodeo.')
+# following code is kept for compatibility with shotgun software version.
+
 import sys
 from setuptools import setup, find_packages
 
@@ -14,14 +17,9 @@ if (sys.version_info[0] <= 2) or (sys.version_info[0] == 2 and sys.version_info[
     if 'install' in script_args and '--no-compile' not in script_args:
         script_args.append('--no-compile')
 
-# version of the library was into when the fork was done
-shotgun_software_version='3.0.32'
-# versionning of the rodeo internal updates
-rodeo_version='1.1.0'
-
 setup(
     name='shotgun_api3',
-    version='-rdo-'.join([shotgun_software_version, rodeo_version]),
+    version='3.0.32',
     description='Shotgun Python API: RodeoFX specifications',
     long_description=readme,
     author='Shotgun Software, RodeoFX',
