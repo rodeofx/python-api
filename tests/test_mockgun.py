@@ -45,14 +45,11 @@ from shotgun_api3.lib.mockgun import Shotgun as Mockgun
 from shotgun_api3 import ShotgunError
 
 
-mockgun_schema_folder = os.path.join(
-    os.path.dirname(__file__),
-    "mockgun"
-)
+mockgun_schema_folder = os.path.join(os.path.dirname(__file__), "mockgun")
 
 Mockgun.set_schema_paths(
     os.path.join(mockgun_schema_folder, "schema.pickle"),
-    os.path.join(mockgun_schema_folder, "schema_entity.pickle")
+    os.path.join(mockgun_schema_folder, "schema_entity.pickle"),
 )
 
 
@@ -67,6 +64,7 @@ class TestMockgunModuleInterface(unittest.TestCase):
         """
 
         from shotgun_api3.lib import mockgun
+
         # Try to access everything. If something is missing, it will raise an
         # error.
         mockgun.MockgunError
@@ -85,7 +83,9 @@ class TestValidateFilterSyntax(unittest.TestCase):
         """
         super(TestValidateFilterSyntax, self).setUp()
 
-        self._mockgun = Mockgun("https://test.shotgunstudio.com", login="user", password="1234")
+        self._mockgun = Mockgun(
+            "https://test.shotgunstudio.com", login="user", password="1234"
+        )
 
         self._mockgun.create("Shot", {"code": "shot"})
 
@@ -97,24 +97,16 @@ class TestValidateFilterSyntax(unittest.TestCase):
         self._mockgun.find(
             "Shot",
             [
-                {
-                    "filter_operator": "any",
-                    "filters": [["code", "is", "shot"]]
-                },
-                [
-                    "code", "is", "shot"
-                ]
-            ]
+                {"filter_operator": "any", "filters": [["code", "is", "shot"]]},
+                ["code", "is", "shot"],
+            ],
         )
 
         # We can't have not dict/list values for filters however.
         self.assertRaisesRegex(
             ShotgunError,
             "Filters can only be lists or dictionaries, not int.",
-            lambda: self._mockgun.find(
-                "Shot",
-                [1]
-            )
+            lambda: self._mockgun.find("Shot", [1]),
         )
 
 
@@ -127,14 +119,21 @@ class TestEntityFieldComparison(unittest.TestCase):
         """
         Creates test data.
         """
-        self._mockgun = Mockgun("https://test.shotgunstudio.com", login="user", password="1234")
+        self._mockgun = Mockgun(
+            "https://test.shotgunstudio.com", login="user", password="1234"
+        )
 
-        self._project_link = self._mockgun.create("Project", {"name": "project", "archived": False})
+        self._project_link = self._mockgun.create(
+            "Project", {"name": "project", "archived": False}
+        )
 
         # This entity will ensure that a populated link field will be comparable.
         self._mockgun.create(
             "PipelineConfiguration",
-            {"code": "with_project", "project": self._project_link, }
+            {
+                "code": "with_project",
+                "project": self._project_link,
+            },
         )
 
         # This entity will ensure that an unpopulated link field will be comparable.
@@ -148,17 +147,23 @@ class TestEntityFieldComparison(unittest.TestCase):
         items = self._mockgun.find("PipelineConfiguration", [["project", "is", None]])
         self.assertEqual(len(items), 1)
 
-        items = self._mockgun.find("PipelineConfiguration", [["project", "is_not", None]])
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["project", "is_not", None]]
+        )
         self.assertEqual(len(items), 1)
 
     def test_searching_for_initialized_entity_field(self):
         """
         Ensures that comparison with an entity works.
         """
-        items = self._mockgun.find("PipelineConfiguration", [["project", "is", self._project_link]])
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["project", "is", self._project_link]]
+        )
         self.assertEqual(len(items), 1)
 
-        items = self._mockgun.find("PipelineConfiguration", [["project", "is_not", self._project_link]])
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["project", "is_not", self._project_link]]
+        )
         self.assertEqual(len(items), 1)
 
     def test_find_entity_with_none_link(self):
@@ -167,7 +172,9 @@ class TestEntityFieldComparison(unittest.TestCase):
         """
         # The pipeline configuration without_project doesn't have the project field set, so we're expecting
         # it to not be returned here.
-        items = self._mockgun.find("PipelineConfiguration", [["project.Project.archived", "is", False]])
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["project.Project.archived", "is", False]]
+        )
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["id"], self._project_link["id"])
 
@@ -176,11 +183,14 @@ class TestTextFieldOperators(unittest.TestCase):
     """
     Checks if text field comparison work.
     """
+
     def setUp(self):
         """
         Creates test data.
         """
-        self._mockgun = Mockgun("https://test.shotgunstudio.com", login="user", password="1234")
+        self._mockgun = Mockgun(
+            "https://test.shotgunstudio.com", login="user", password="1234"
+        )
         self._user = self._mockgun.create("HumanUser", {"login": "user"})
 
     def test_operator_contains(self):
@@ -196,7 +206,9 @@ class TestDateDatetimeFields(TestBaseWithExceptionTests):
 
     def setUp(self):
         """Test data"""
-        self._mockgun = Mockgun("https://test.shotgunstudio.com", login="user", password="1234")
+        self._mockgun = Mockgun(
+            "https://test.shotgunstudio.com", login="user", password="1234"
+        )
 
     def test_dateDataAreStoredAsString(self):
         """
@@ -222,7 +234,9 @@ class TestDateDatetimeFields(TestBaseWithExceptionTests):
             "Project", {"name": "Death Star", "updated_at": datetime_}
         )
         self.assertEqual(
-            datetime_, project["updated_at"], msg="A datetime should have been kept as a datetime."
+            datetime_,
+            project["updated_at"],
+            msg="A datetime should have been kept as a datetime.",
         )
 
 
@@ -236,7 +250,9 @@ class TestMultiEntityFieldComparison(unittest.TestCase):
         Creates test data.
         """
 
-        self._mockgun = Mockgun("https://test.shotgunstudio.com", login="user", password="1234")
+        self._mockgun = Mockgun(
+            "https://test.shotgunstudio.com", login="user", password="1234"
+        )
 
         # Create two users to assign to the pipeline configurations.
         self._user1 = self._mockgun.create("HumanUser", {"login": "user1"})
@@ -244,54 +260,67 @@ class TestMultiEntityFieldComparison(unittest.TestCase):
 
         # Create pipeline configurations that are assigned none, one or two users.
         self._mockgun.create(
-            "PipelineConfiguration",
-            {"code": "with_user1", "users": [self._user1]}
+            "PipelineConfiguration", {"code": "with_user1", "users": [self._user1]}
+        )
+
+        self._mockgun.create(
+            "PipelineConfiguration", {"code": "with_user2", "users": [self._user2]}
         )
 
         self._mockgun.create(
             "PipelineConfiguration",
-            {"code": "with_user2", "users": [self._user2]}
+            {"code": "with_both", "users": [self._user2, self._user1]},
         )
 
         self._mockgun.create(
-            "PipelineConfiguration",
-            {"code": "with_both", "users": [self._user2, self._user1]}
-        )
-
-        self._mockgun.create(
-            "PipelineConfiguration",
-            {"code": "with_none", "users": []}
+            "PipelineConfiguration", {"code": "with_none", "users": []}
         )
 
     def test_find_by_sub_entity_field(self):
         """
         Ensures that queries on linked entity fields works.
         """
-        items = self._mockgun.find("PipelineConfiguration", [["users.HumanUser.login", "is", "user1"]])
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["users.HumanUser.login", "is", "user1"]]
+        )
         self.assertEqual(len(items), 2)
 
-        items = self._mockgun.find("PipelineConfiguration", [["users.HumanUser.login", "is", "user2"]])
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["users.HumanUser.login", "is", "user2"]]
+        )
         self.assertEqual(len(items), 2)
 
-        items = self._mockgun.find("PipelineConfiguration", [["users.HumanUser.login", "contains", "ser"]])
-        self.assertEqual(len(items), 3)
-
-        # Lets get fancy a bit.
-        items = self._mockgun.find("PipelineConfiguration", [{
-            "filter_operator": "any",
-            "filters": [
-                ["users.HumanUser.login", "is", "user1"],
-                ["users.HumanUser.login", "is", "user2"]
-            ]}]
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["users.HumanUser.login", "contains", "ser"]]
         )
         self.assertEqual(len(items), 3)
 
-        items = self._mockgun.find("PipelineConfiguration", [{
-            "filter_operator": "all",
-            "filters": [
-                ["users.HumanUser.login", "is", "user1"],
-                ["users.HumanUser.login", "is", "user2"]
-            ]}]
+        # Lets get fancy a bit.
+        items = self._mockgun.find(
+            "PipelineConfiguration",
+            [
+                {
+                    "filter_operator": "any",
+                    "filters": [
+                        ["users.HumanUser.login", "is", "user1"],
+                        ["users.HumanUser.login", "is", "user2"],
+                    ],
+                }
+            ],
+        )
+        self.assertEqual(len(items), 3)
+
+        items = self._mockgun.find(
+            "PipelineConfiguration",
+            [
+                {
+                    "filter_operator": "all",
+                    "filters": [
+                        ["users.HumanUser.login", "is", "user1"],
+                        ["users.HumanUser.login", "is", "user2"],
+                    ],
+                }
+            ],
         )
         self.assertEqual(len(items), 1)
 
@@ -299,16 +328,20 @@ class TestMultiEntityFieldComparison(unittest.TestCase):
         """
         Ensures comparison with multi-entity fields and None works.
         """
-        items = self._mockgun.find("PipelineConfiguration", [["users", "is", None]], ["users"])
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["users", "is", None]], ["users"]
+        )
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["users"], [])
 
-        items = self._mockgun.find("PipelineConfiguration", [["users", "is_not", None]], ["users"])
+        items = self._mockgun.find(
+            "PipelineConfiguration", [["users", "is_not", None]], ["users"]
+        )
         self.assertEqual(len(items), 3)
         for item in items:
             self.assertTrue(len(item["users"]) > 0)
 
-            
+
 class TestMultiEntityFieldUpdate(unittest.TestCase):
     """
     Ensures multi entity field update modes work.
@@ -319,13 +352,15 @@ class TestMultiEntityFieldUpdate(unittest.TestCase):
         Creates test data.
         """
 
-        self._mockgun = Mockgun("https://test.shotgunstudio.com", login="user", password="1234")
+        self._mockgun = Mockgun(
+            "https://test.shotgunstudio.com", login="user", password="1234"
+        )
 
         # Create two versions to assign to the shot.
         self._version1 = self._mockgun.create("Version", {"code": "version1"})
         self._version2 = self._mockgun.create("Version", {"code": "version2"})
         self._version3 = self._mockgun.create("Version", {"code": "version3"})
-        
+
         # remove 'code' field for later comparisons
         del self._version1["code"]
         del self._version2["code"]
@@ -334,15 +369,18 @@ class TestMultiEntityFieldUpdate(unittest.TestCase):
         # Create playlists
         self._add_playlist = self._mockgun.create(
             "Playlist",
-            {"code": "playlist1", "versions": [self._version1, self._version2]}
+            {"code": "playlist1", "versions": [self._version1, self._version2]},
         )
         self._remove_playlist = self._mockgun.create(
             "Playlist",
-            {"code": "playlist1", "versions": [self._version1, self._version2, self._version3]}
+            {
+                "code": "playlist1",
+                "versions": [self._version1, self._version2, self._version3],
+            },
         )
         self._set_playlist = self._mockgun.create(
             "Playlist",
-            {"code": "playlist1", "versions": [self._version1, self._version2]}
+            {"code": "playlist1", "versions": [self._version1, self._version2]},
         )
 
     def test_update_add(self):
@@ -350,8 +388,10 @@ class TestMultiEntityFieldUpdate(unittest.TestCase):
         Ensures that "add" multi_entity_update_mode works.
         """
         self._mockgun.update(
-            "Playlist", self._add_playlist["id"], {"versions": [self._version3]},
-            multi_entity_update_modes={"versions": "add"}
+            "Playlist",
+            self._add_playlist["id"],
+            {"versions": [self._version3]},
+            multi_entity_update_modes={"versions": "add"},
         )
 
         playlist = self._mockgun.find_one(
@@ -366,8 +406,10 @@ class TestMultiEntityFieldUpdate(unittest.TestCase):
         Ensures that "remove" multi_entity_update_mode works.
         """
         self._mockgun.update(
-            "Playlist", self._remove_playlist["id"], {"versions": [self._version2]},
-            multi_entity_update_modes={"versions": "remove"}
+            "Playlist",
+            self._remove_playlist["id"],
+            {"versions": [self._version2]},
+            multi_entity_update_modes={"versions": "remove"},
         )
 
         playlist = self._mockgun.find_one(
@@ -383,14 +425,14 @@ class TestMultiEntityFieldUpdate(unittest.TestCase):
             "Playlist",
             self._set_playlist["id"],
             {"versions": [self._version2, self._version3]},
-            multi_entity_update_modes={"versions": "set"}
+            multi_entity_update_modes={"versions": "set"},
         )
 
         playlist = self._mockgun.find_one(
             "Playlist", [["id", "is", self._set_playlist["id"]]], ["versions"]
         )
         self.assertEqual(playlist["versions"], [self._version2, self._version3])
-    
+
     def test_batch_update(self):
         self._mockgun.batch(
             [
@@ -399,7 +441,7 @@ class TestMultiEntityFieldUpdate(unittest.TestCase):
                     "entity_type": "Playlist",
                     "entity_id": self._set_playlist["id"],
                     "data": {"versions": [self._version1, self._version2]},
-                    "multi_entity_update_modes": {"versions": "set"}
+                    "multi_entity_update_modes": {"versions": "set"},
                 }
             ]
         )
@@ -420,44 +462,24 @@ class TestFilterOperator(unittest.TestCase):
         """
         super(TestFilterOperator, self).setUp()
 
-        self._mockgun = Mockgun("https://test.shotgunstudio.com", login="user", password="1234")
-
-        self._prj1_link = self._mockgun.create(
-            "Project",
-            {
-                "name": "prj1"
-            }
+        self._mockgun = Mockgun(
+            "https://test.shotgunstudio.com", login="user", password="1234"
         )
 
-        self._prj2_link = self._mockgun.create(
-            "Project",
-            {
-                "name": "prj2"
-            }
-        )
+        self._prj1_link = self._mockgun.create("Project", {"name": "prj1"})
+
+        self._prj2_link = self._mockgun.create("Project", {"name": "prj2"})
 
         self._shot1 = self._mockgun.create(
-            "Shot",
-            {
-                "code": "shot1",
-                "project": self._prj1_link
-            }
+            "Shot", {"code": "shot1", "project": self._prj1_link}
         )
 
         self._shot2 = self._mockgun.create(
-            "Shot",
-            {
-                "code": "shot2",
-                "project": self._prj1_link
-            }
+            "Shot", {"code": "shot2", "project": self._prj1_link}
         )
 
         self._shot3 = self._mockgun.create(
-            "Shot",
-            {
-                "code": "shot3",
-                "project": self._prj2_link
-            }
+            "Shot", {"code": "shot3", "project": self._prj2_link}
         )
 
     def test_simple_filter_operators(self):
@@ -466,26 +488,24 @@ class TestFilterOperator(unittest.TestCase):
         """
         shots = self._mockgun.find(
             "Shot",
-            [{
-                "filter_operator": "any",
-                "filters": [
-                    ["code", "is", "shot1"],
-                    ["code", "is", "shot2"]
-                ]
-            }]
+            [
+                {
+                    "filter_operator": "any",
+                    "filters": [["code", "is", "shot1"], ["code", "is", "shot2"]],
+                }
+            ],
         )
 
         self.assertEqual(len(shots), 2)
 
         shots = self._mockgun.find(
             "Shot",
-            [{
-                "filter_operator": "all",
-                "filters": [
-                    ["code", "is", "shot1"],
-                    ["code", "is", "shot2"]
-                ]
-            }]
+            [
+                {
+                    "filter_operator": "all",
+                    "filters": [["code", "is", "shot1"], ["code", "is", "shot2"]],
+                }
+            ],
         )
 
         self.assertEqual(len(shots), 0)
@@ -505,47 +525,36 @@ class TestFilterOperator(unittest.TestCase):
                             "filter_operator": "all",
                             "filters": [
                                 ["code", "is", "shot1"],
-                                ["project", "is", self._prj1_link]
-                            ]
+                                ["project", "is", self._prj1_link],
+                            ],
                         },
                         {
                             "filter_operator": "all",
                             "filters": [
                                 ["code", "is", "shot3"],
-                                ["project", "is", self._prj2_link]
-                            ]
-                        }
-                    ]
+                                ["project", "is", self._prj2_link],
+                            ],
+                        },
+                    ],
                 }
-            ]
+            ],
         )
 
         self.assertEqual(len(shots), 2)
 
     def test_invalid_operator(self):
-
         self.assertRaisesRegex(
             ShotgunError,
             "Unknown filter_operator type: bad",
             lambda: self._mockgun.find(
-                "Shot",
-                [
-                    {
-                        "filter_operator": "bad",
-                        "filters": []
-                    }
-                ])
+                "Shot", [{"filter_operator": "bad", "filters": []}]
+            ),
         )
 
         self.assertRaisesRegex(
             ShotgunError,
             "Bad filter operator, requires keys 'filter_operator' and 'filters',",
-            lambda: self._mockgun.find(
-                "Shot",
-                [
-                    {
-                    }
-                ])
+            lambda: self._mockgun.find("Shot", [{}]),
         )
 
 
@@ -573,5 +582,5 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(mockgun.config.api_path, "/something/api3/json")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

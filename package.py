@@ -1,17 +1,14 @@
 name = "shotgun_api3"
 
 shotgunSoftwareVersion = "3.0.32"
-rodeoVersion = "1.2.0"
+rodeoVersion = "1.3.0"
 version = "-rdo-".join([shotgunSoftwareVersion, rodeoVersion])
 
-authors = [
-    "shotgundev@rodeofx.com"
-]
+authors = ["shotgundev@rodeofx.com"]
 
-description = \
-    """Fork of the python api of shotgun."""
+description = """Fork of the python api of shotgun."""
 
-requires = ['python-2.4+<3',]
+requires = ['python-2.4+<3']
 
 variants = []
 
