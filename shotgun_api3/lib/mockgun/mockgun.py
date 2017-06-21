@@ -609,6 +609,10 @@ class Shotgun(object):
                 if rval is None:
                     return len(lval) != 0
                 return rval["id"] not in (sub_lval["id"] for sub_lval in lval)
+            elif operator == 'in':
+                if rval is None:
+                    return len(lval) != 0
+                return all(element['id'] in (sub_lval['id'] for sub_lval in lval) for element in rval)
 
         raise ShotgunError("The %s operator is not supported on the %s type" % (operator, field_type))
 
