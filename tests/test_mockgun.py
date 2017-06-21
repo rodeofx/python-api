@@ -330,6 +330,16 @@ class TestMultiEntityFieldComparison(TestBaseWithExceptionTests):
         for item in items:
             self.assertTrue(len(item["users"]) > 0)
 
+    def test_find_in(self):
+        """Ensures comparison with multi-entity using in."""
+        user = self._mockgun.find_one('HumanUser', [['login', 'is', 'user1']])
+        project = self._mockgun.create(
+            "Project", {"name": "unittest", "users": [self._user1, self._user2]}
+        )
+
+        result = self._mockgun.find('Project', [['users', 'in', user]])
+        self.assertEqual(project['id'], result[0]['id'])
+
 
 class TestFilterOperator(TestBaseWithExceptionTests):
     """
