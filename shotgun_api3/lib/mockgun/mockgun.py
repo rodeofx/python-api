@@ -466,6 +466,7 @@ class Shotgun(object):
                                    "serializable": dict,
                                    "date": basestring,
                                    "date_time": datetime.datetime,
+                                   "duration": int,
                                    "list": basestring,
                                    "status_list": basestring,
                                    "url": dict}[sg_type]
