@@ -19,7 +19,7 @@ if (sys.version_info[0] <= 2) or (sys.version_info[0] == 2 and sys.version_info[
 
 setup(
     name='shotgun_api3',
-    version='3.0.32',
+    version='3.0.34',
     description='Shotgun Python API: RodeoFX specifications',
     long_description=readme,
     author='Shotgun Software, RodeoFX',
