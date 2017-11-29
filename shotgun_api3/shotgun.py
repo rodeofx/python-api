@@ -832,8 +832,9 @@ class Shotgun(object):
         """
         return self._call_rpc("info", None, include_auth_params=False)
 
-    def find_one(self, entity_type, filters, fields=None, order=None, filter_operator=None, retired_only=False,
-                 include_archived_projects=True, additional_filter_presets=None):
+    def find_one(self, entity_type, filters, fields=None, order=None,
+        filter_operator=None, retired_only=False, include_archived_projects=False,
+        additional_filter_presets=None):
         """
         Shortcut for :meth:`~shotgun_api3.Shotgun.find` with ``limit=1`` so it returns a single
         result.
@@ -861,7 +862,7 @@ class Shotgun(object):
             retired. There is no option to return both retired and non-retired entities in the
             same query.
         :param bool include_archived_projects: Optional boolean flag to include entities whose projects
-            have been archived. Defaults to ``True``.
+            have been archived. Defaults to ``False``.
         :param additional_filter_presets: Optional list of presets to further filter the result
             set, list has the form::
 
@@ -885,8 +886,9 @@ class Shotgun(object):
             return results[0]
         return None
 
-    def find(self, entity_type, filters, fields=None, order=None, filter_operator=None, limit=0,
-             retired_only=False, page=0, include_archived_projects=True, additional_filter_presets=None):
+    def find(self, entity_type, filters, fields=None, order=None,
+            filter_operator=None, limit=0, retired_only=False, page=0,
+            include_archived_projects=False, additional_filter_presets=None):
         """
         Find entities matching the given filters.
 
@@ -957,7 +959,7 @@ class Shotgun(object):
             retired. There is no option to return both retired and non-retired entities in the
             same query.
         :param bool include_archived_projects: Optional boolean flag to include entities whose projects
-            have been archived. Defaults to ``True``.
+            have been archived. Defaults to ``False``.
         :param additional_filter_presets: Optional list of presets to further filter the result
             set, list has the form::
 
@@ -1106,7 +1108,7 @@ class Shotgun(object):
                   summary_fields,
                   filter_operator=None,
                   grouping=None,
-                  include_archived_projects=True):
+                  include_archived_projects=False):
         """
         Summarize field data returned by a query.
 
