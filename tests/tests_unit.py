@@ -164,9 +164,10 @@ class TestShotgunSummarize(unittest.TestCase):
         result = self.get_call_rpc_params(args, {})
         actual_condition = result['filters']['conditions'][0]
         self.assertEquals(expected_condition, actual_condition)
-        
+
+    @patch('shotgun_api3.shotgun.ServerCapabilities')
     @patch('shotgun_api3.Shotgun._call_rpc')
-    def get_call_rpc_params(self, args, kws, call_rpc):
+    def get_call_rpc_params(self, args, kws, call_rpc, server_caps):
         '''Return params sent to _call_rpc from summarize.'''
         if not args:
             args = [None, [], None]

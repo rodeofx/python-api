@@ -1,7 +1,7 @@
 name = "shotgun_api3"
 
 shotgunSoftwareVersion = "3.0.32"
-rodeoVersion = "1.4.0"
+rodeoVersion = "1.4.1"
 version = "-rdo-".join([shotgunSoftwareVersion, rodeoVersion])
 
 authors = ["shotgundev@rodeofx.com"]
