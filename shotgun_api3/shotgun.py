@@ -699,7 +699,7 @@ class Shotgun(object):
 
         results = self.find(entity_type, filters, fields, order,
             filter_operator, 1, retired_only, include_archived_projects=include_archived_projects,
-            additional_filter_presets=additional_filter_presets)
+            additional_filter_presets=additional_filter_presets, called_from_find_one=True)
 
         if results:
             return results[0]
@@ -707,7 +707,8 @@ class Shotgun(object):
 
     def find(self, entity_type, filters, fields=None, order=None,
             filter_operator=None, limit=0, retired_only=False, page=0,
-            include_archived_projects=False, additional_filter_presets=None):
+            include_archived_projects=False, additional_filter_presets=None,
+            called_from_find_one=False):
         """
         Find entities matching the given filters.
 
@@ -789,6 +790,9 @@ class Shotgun(object):
 
             For details on supported presets and the format of this parameter see
             :ref:`additional_filter_presets`
+        :param bool called_from_find_one: RodeoFX argument added to make it easier to know
+            when it is called the :meth:`find_one` method. We use that in our wrapper to only log
+            what's necessary and avoid doubled logs.
         :returns: list of dictionaries representing each entity with the requested fields, and the
             defaults ``"id"`` and ``"type"`` which are always included.
         :rtype: list
