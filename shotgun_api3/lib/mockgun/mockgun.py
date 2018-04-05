@@ -469,7 +469,8 @@ class Shotgun(object):
                                    "duration": int,
                                    "list": basestring,
                                    "status_list": basestring,
-                                   "url": dict}[sg_type]
+                                   "url": dict,
+                                   "entity_type": basestring}[sg_type]
                 except KeyError:
                     raise ShotgunError("Field %s.%s: Handling for Shotgun type %s is not implemented" % (entity_type, field, sg_type)) 
                 
