@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-raise DeprecationWarning('Use rez-build to build this package at Rodeo.')
-# following code is kept for compatibility with shotgun software version.
-
 import sys
 from setuptools import setup, find_packages
+
+import package
 
 f = open('README.md')
 readme = f.read().strip()
@@ -19,7 +18,7 @@ if (sys.version_info[0] <= 2) or (sys.version_info[0] == 2 and sys.version_info[
 
 setup(
     name='shotgun_api3',
-    version='3.0.36',
+    version='3.0.37+rdo{0}'.format(package.rodeoVersion),
     description='Shotgun Python API: RodeoFX specifications',
     long_description=readme,
     author='Shotgun Software, RodeoFX',
