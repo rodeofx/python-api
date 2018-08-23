@@ -19,7 +19,7 @@ if (sys.version_info[0] <= 2) or (sys.version_info[0] == 2 and sys.version_info[
 
 setup(
     name='shotgun_api3',
-    version='3.0.32',
+    version='3.0.36',
     description='Shotgun Python API: RodeoFX specifications',
     long_description=readme,
     author='Shotgun Software, RodeoFX',
@@ -29,6 +29,6 @@ setup(
     packages=find_packages(exclude=('tests',)),
     script_args=script_args,
     include_package_data=True,
-    package_data={'': [ 'cacerts.txt']},
+    package_data={'': ['cacerts.txt']},
     zip_safe=False,
 )
