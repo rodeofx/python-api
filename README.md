@@ -1,3 +1,11 @@
+[![VFX Platform](https://img.shields.io/badge/vfxplatform-2018-yellow.svg)](http://www.vfxplatform.com/)
+[![Reference Documentation](http://img.shields.io/badge/doc-reference-blue.svg)](http://developer.shotgunsoftware.com/python-api)
+[![Build Status Linux](https://secure.travis-ci.org/shotgunsoftware/python-api.svg?branch=master)](http://travis-ci.org/shotgunsoftware/python-api)
+[![Build status Windows](https://ci.appveyor.com/api/projects/status/slvw7u4jatvdly98/branch/master?svg=true
+)](https://ci.appveyor.com/project/jfboismenu/python-api/branch/master)
+[![Coverage Status](https://coveralls.io/repos/github/shotgunsoftware/python-api/badge.svg?branch=master)](https://coveralls.io/github/shotgunsoftware/python-api?branch=master)
+[![Linting](https://img.shields.io/badge/PEP8%20by-Hound%20CI-a873d1.svg)](https://houndci.com)
+
 # Shotgun Python API
 
 Shotgun provides a simple Python-based API for accessing Shotgun and integrating with other tools. This is the official API that is maintained by Shotgun Software (support@shotgunsoftware.com)
@@ -7,12 +15,11 @@ The latest version can always be found at http://github.com/shotgunsoftware/pyth
 ## Minimum Requirements
 
 * Shotgun server v2.4.12+.
-* Python v2.4 - v2.7.
+* Python v2.6 - v2.7.
 
 ## High Performance Requirements
 
-* For Python 2.4 and 2.5, install [simplejson 2.0.9](http://pypi.python.org/pypi/simplejson/2.0.9)
-* For Python 2.6 and higher, install [simplejson 2.1.6](http://pypi.python.org/pypi/simplejson/2.1.6)
+* Install [simplejson 2.1.6](http://pypi.python.org/pypi/simplejson/2.1.6)
 
 ## Documentation
 Tutorials and detailed documentation about the Python API are available at http://developer.shotgunsoftware.com/python-api). 
@@ -29,11 +36,15 @@ Some useful direct links:
 
 You can see the [full history of the Python API on the documentation site](http://developer.shotgunsoftware.com/python-api/changelog.html).
 
+## Updating HTTPLib2
+
+1. Download the latest version of HTTPLib2 at https://pypi.org/project/httplib2.
+2. Extract the python2/httplib2 into shotgun_api3/lib/http2lib without the test folder.
+3. Scan the files for any references to importing httplib2 and make sure they import "from ." instead of "from httplib2" because the library isn't in the Python path.
+
 ## Tests 
 
 Integration and unit tests are provided. 
-
-[![Build Status](https://secure.travis-ci.org/shotgunsoftware/python-api.png?branch=master)](http://travis-ci.org/shotgunsoftware/python-api)
 
 - All tests require the [nose unit testing tools](http://nose.readthedocs.org), and a `tests/config` file (you can copy an example from `tests/example_config`).
 - Tests can be run individually like this: `nosetest tests/test_client.py`
@@ -41,7 +52,38 @@ Integration and unit tests are provided.
 - `test_api` and `test_api_long` *do* require a Shotgun instance, with a script key available for the tests. The server and script user values must be supplied in the `tests/config` file. The tests will add test data to your server based on information in your config. This data will be manipulated by the tests, and should not be used for other purposes.
 - To run all of the tests, use the shell script `run-tests`.
 
+## Release process
 
+### Packaging up new release
 
+1) Update the Changelog in the `HISTORY.rst` file
+    - Add bullet points for any changes that have happened since the previous release. This may include changes you did not make so look at the commit history and make sure we don't miss anything. If you notice something was done that wasn't added to the changelog, hunt down that engineer and make them feel guilty for not doing so. This is a required step in making changes to the API.
+    - Try and match the language of previous change log messages. We want to keep a consistent voice. 
+    - Make sure the date of the release matches today. We try and keep this TBD until we're ready to do a release so it's easy to catch that it needs to be updated.
+    - Make sure the version number is filled out and correct. We follow semantic versioning. Or more correctly, we should be following it.
+2) Ensure any changes or additions to public methods are documented
+    - Update the Github wiki, and usually you'll need to update the Method Reference page with concise and exact documentation of the changes that are in this release. 
+    - Ensure that doc strings are updated in the code itself to work with Sphinx and are correctly formatted.
+    - Examples are always good especially if this a new feature or method.
+    - Think about a new user to the API trying to figure out how to use the features you're documenting.
+3) Update the version value in `python-api/setup.py`  to match the version you are packaging. This controls what version users will get when installing via pip.
+4) Update the `__version__` value in `shotgun_api3/shotgun.py` to the version you're releasing. This identified the current version within the API itself.
+5) Commit these changes in master with a commit message like `packaging for the vx.x.x release`.
+6) Create a tag based off of the master branch called `vx.x.x` to match the version number you're releasing.
+7) Push master and your tag to Github.
+8) Update the Releases page with your new release.
+    - The release should already be there from your tag but if not, create a new one.
+    - Add more detailed information regarding the changes in this release. This is a great place to add examples, and reasons for the change!
 
+### Letting the world know
+We usually send an email to the `shotgun-dev` list with an announcement of the release and highlight the changes. 
 
+### Prepare for the Next Dev Cycle
+1) Update the `__version__` value in `shotgun_api3/shotgun.py` to the next version number with `.dev` appended to it. For example, `v3.0.24.dev`
+2) Add a new section to the Changelog in the `HISTORY.rst` file with the next version number and a TBD date
+```
+    **v3.0.24 - TBD**
+       + TBD
+```
+3) Commit the changes to master with a commit message like `Bump version to v3.0.24.dev`
+4) Push master to Github

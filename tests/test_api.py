@@ -15,6 +15,7 @@ import unittest
 import urlparse
 import urllib2
 import warnings
+import glob
 
 import shotgun_api3
 from shotgun_api3.lib.httplib2 import Http, SSLHandshakeError
@@ -179,13 +180,21 @@ class TestShotgunApi(base.LiveTestBase):
         # test download with attachment hash
         ticket = self.sg.find_one('Ticket', [['id', 'is', self.ticket['id']]],
                                   ['attachments'])
-        attach_file = self.sg.download_attachment(ticket['attachments'][0])
+
+        # Look for the attachment we just uploaded, the attachments are not returned from latest
+        # to earliest.
+        attachment = [x for x in ticket["attachments"] if x["id"] == attach_id]
+        self.assertEqual(len(attachment), 1)
+
+        attachment = attachment[0]
+        attach_file = self.sg.download_attachment(attachment)
+
         self.assertTrue(attach_file is not None)
         self.assertEqual(size, len(attach_file))
         self.assertEqual(orig_file, attach_file)
 
         # test download with attachment hash (write to disk)
-        result = self.sg.download_attachment(ticket['attachments'][0],
+        result = self.sg.download_attachment(attachment,
                                              file_path=file_path)
         self.assertEqual(result, file_path)
         fp = open(file_path, 'rb')
@@ -210,8 +219,83 @@ class TestShotgunApi(base.LiveTestBase):
                             {"id":123, "type":"Shot"})
         self.assertRaises(TypeError, self.sg.download_attachment)
 
+        # test upload of non-ascii, unicode path
+        u_path = os.path.abspath(
+            os.path.expanduser(
+                glob.glob(os.path.join(unicode(this_dir), u'No*l.jpg'))[0]
+            )
+        )
+
+        # If this is a problem, it'll raise with a UnicodeEncodeError. We
+        # don't need to check the results of the upload itself -- we're
+        # only checking that the non-ascii string encoding doesn't trip
+        # us up the way it used to.
+        self.sg.upload(
+            "Ticket",
+            self.ticket['id'],
+            u_path,
+            'attachments',
+            tag_list="monkeys, everywhere, send, help"
+        )
+
+        # Also make sure that we can pass in a utf-8 encoded string path
+        # with non-ascii characters and have it work properly. This is
+        # primarily a concern on Windows, as it doesn't handle that
+        # situation as well as OS X and Linux.
+        self.sg.upload(
+            "Ticket",
+            self.ticket['id'],
+            u_path.encode("utf-8"),
+            'attachments',
+            tag_list="monkeys, everywhere, send, help"
+        )
+
+        # Make sure that non-utf-8 encoded paths raise when they can't be
+        # converted to utf-8.
+        #
+        # We need to touch the file we're going to test with first. We can't
+        # bundle a file with this filename in the repo due to some pip install
+        # problems on Windows. Note that the path below is utf-8 encoding of
+        # what we'll eventually encode as shift-jis.
+        file_path_s = os.path.join(this_dir, "./\xe3\x81\x94.shift-jis")
+        file_path_u = file_path_s.decode("utf-8")
+        if sys.platform.startswith("win"):
+            fh = open(file_path_u, "w")
+        else:
+            fh = open(file_path_s, "w")
+
+        try:
+            fh.write("This is just a test file with some random data in it.")
+        finally:
+            fh.close()
+
+        u_path = os.path.abspath(
+            os.path.expanduser(
+                glob.glob(os.path.join(unicode(this_dir), u'*.shift-jis'))[0]
+            )
+        )
+        self.assertRaises(
+            shotgun_api3.ShotgunError,
+            self.sg.upload,
+            "Ticket",
+            self.ticket['id'],
+            u_path.encode("shift-jis"),
+            'attachments',
+            tag_list="monkeys, everywhere, send, help"
+        )
+
+        # But it should work in all cases if a unicode string is used.
+        self.sg.upload(
+            "Ticket",
+            self.ticket['id'],
+            u_path,
+            'attachments',
+            tag_list="monkeys, everywhere, send, help"
+        )
+
         # cleanup
         os.remove(file_path)
+        os.remove(u_path)
 
     def test_upload_thumbnail_in_create(self):
         """Upload a thumbnail via the create method"""
@@ -249,10 +333,9 @@ class TestShotgunApi(base.LiveTestBase):
         self.assertEqual(new_version.get('project'), self.project)
         self.assertTrue(new_version.get('filmstrip_image') is not None)
 
-        h = Http(".cache")
-        filmstrip_thumb_resp, content = h.request(new_version.get('filmstrip_image'), "GET")
-        self.assertEqual(filmstrip_thumb_resp['status'], '200')
-        self.assertEqual(filmstrip_thumb_resp['content-type'], 'image/jpeg')
+        url = new_version.get('filmstrip_image')
+        data = self.sg.download_attachment({'url': url})
+        self.assertTrue(isinstance(data, str))
 
         self.sg.delete("Version", new_version['id'])
     # end test_upload_thumbnail_in_create
@@ -331,6 +414,68 @@ class TestShotgunApi(base.LiveTestBase):
         #upload filmstrip thumbnail
         f_thumb_id = self.sg.upload("Task", self.task['id'], path, 'filmstrip_image')
         self.assertTrue(isinstance(f_thumb_id, int))
+
+    def test_requires_direct_s3_upload(self):
+        """Test _requires_direct_s3_upload"""
+
+        upload_types = self.sg.server_info.get("s3_enabled_upload_types")
+        direct_uploads_enabled = self.sg.server_info.get("s3_direct_uploads_enabled")
+
+        self.sg.server_info["s3_enabled_upload_types"] = None
+        self.sg.server_info["s3_direct_uploads_enabled"] = None
+
+        # Test s3_enabled_upload_types and s3_direct_uploads_enabled not set
+        self.assertFalse(self.sg._requires_direct_s3_upload("Version", "sg_uploaded_movie"))
+
+        self.sg.server_info["s3_enabled_upload_types"] = {
+            "Version": ["sg_uploaded_movie"]
+        }
+
+        # Test direct_uploads_enabled not set
+        self.assertFalse(self.sg._requires_direct_s3_upload("Version", "sg_uploaded_movie"))
+
+        self.sg.server_info["s3_direct_uploads_enabled"] = True
+
+        # Test regular path
+        self.assertTrue(self.sg._requires_direct_s3_upload("Version", "sg_uploaded_movie"))
+        self.assertFalse(self.sg._requires_direct_s3_upload("Version", "abc"))
+        self.assertFalse(self.sg._requires_direct_s3_upload("Abc", "abc"))
+
+        # Test star field wildcard and arrays of fields
+        self.sg.server_info["s3_enabled_upload_types"] = {
+            "Version": ["sg_uploaded_movie", "test", "other"],
+            "Test": ["*"],
+            "Asset": "*"
+        }
+
+        self.assertTrue(self.sg._requires_direct_s3_upload("Version", "sg_uploaded_movie"))
+        self.assertTrue(self.sg._requires_direct_s3_upload("Version", "test"))
+        self.assertTrue(self.sg._requires_direct_s3_upload("Version", "other"))
+        self.assertTrue(self.sg._requires_direct_s3_upload("Test", "abc"))
+        self.assertTrue(self.sg._requires_direct_s3_upload("Asset", "test"))
+
+        # Test default allowed upload type
+        self.sg.server_info["s3_enabled_upload_types"] = None
+        self.assertTrue(self.sg._requires_direct_s3_upload("Version", "sg_uploaded_movie"))
+        self.assertFalse(self.sg._requires_direct_s3_upload("Version", "test"))
+
+        # Test star entity_type
+        self.sg.server_info["s3_enabled_upload_types"] = {
+            "*": ["sg_uploaded_movie", "test"]
+        }
+        self.assertTrue(self.sg._requires_direct_s3_upload("Something", "sg_uploaded_movie"))
+        self.assertTrue(self.sg._requires_direct_s3_upload("Version", "test"))
+        self.assertFalse(self.sg._requires_direct_s3_upload("Version", "other"))
+
+        # Test entity_type and field_name wildcard
+        self.sg.server_info["s3_enabled_upload_types"] = {
+            "*": "*"
+        }
+        self.assertTrue(self.sg._requires_direct_s3_upload("Something", "sg_uploaded_movie"))
+        self.assertTrue(self.sg._requires_direct_s3_upload("Version", "abc"))
+
+        self.sg.server_info["s3_enabled_upload_types"] = upload_types
+        self.sg.server_info["s3_direct_uploads_enabled"] = direct_uploads_enabled
 
     def test_linked_thumbnail_url(self):
         this_dir, _ = os.path.split(__file__)
@@ -553,7 +698,14 @@ class TestShotgunApi(base.LiveTestBase):
         self.sg.batch(batch_data)
 
         self.assertEqual(result['summaries'], count)
-        self.assertEqual(result['groups'], groups)
+        # Do not assume the order of the summarized results.
+        self.assertEqual(
+            sorted(
+                result['groups'],
+                key=lambda x: x["group_name"]
+            ),
+            groups
+        )
 
     def test_ensure_ascii(self):
         '''test_ensure_ascii tests ensure_unicode flag.'''
@@ -635,6 +787,52 @@ class TestShotgunApi(base.LiveTestBase):
         resp = self.sg.work_schedule_read(start_date, end_date, project, user)
         work_schedule['2012-01-04'] = {"reason": "USER_EXCEPTION", "working": False, "description": "Artist Holiday"}
         self.assertEqual(work_schedule, resp)
+
+    def test_preferences_read(self):
+        # Only run the tests on a server with the feature.
+        if not self.sg.server_caps.version or self.sg.server_caps.version < (7, 10, 0):
+            return
+
+        # This is a big diff if it fails, so show everything.
+        self.maxDiff = None
+
+        # all prefs
+        resp = self.sg.preferences_read()
+
+        expected = {
+            'date_component_order': 'month_day',
+            'format_currency_fields_decimal_options': '$1,000.99',
+            'format_currency_fields_display_dollar_sign': False,
+            'format_currency_fields_negative_options': '- $1,000',
+            'format_date_fields': '08/04/22 OR 04/08/22 (depending on the Month order preference)',
+            'format_float_fields': '9,999.99',
+            'format_float_fields_rounding': '9.999999',
+            'format_footage_fields': '10-05',
+            'format_number_fields': '1,000',
+            'format_time_hour_fields': '12 hour',
+            'support_local_storage': False,
+            'view_master_settings': '{"status_groups":[{"name":"Upcoming","code":"upc_stgr","status_list":["wtg","rdy"]},{"name":"Active","code":"act_stgr","status_list":["ip","kickbk","rev","act","rsk","blk","late","opn","pndng","tkt","push","rrq","vwd","out"]},{"name":"Done","code":"done_stgr","status_list":["fin","cmpt","apr","cbb","clsd","cfrm","dlvr","recd","res"]}],"entity_fields":{"Task":["content","sg_description","sg_status_list","due_date","task_assignees","task_reviewers"],"Shot":["code","description","sg_status_list","created_at","sg_cut_in","sg_cut_out","sg_cut_duration","sg_cut_order"],"Asset":["code","description","sg_status_list","created_at"],"Scene":["code","sg_status_list","created_at"],"Element":["code","sg_status_list","created_at"],"Release":["code","sg_status_list","created_at"],"ShootDay":["code","sg_status_list","created_at"],"MocapTake":["code","sg_status_list","created_at"],"MocapSetup":["code","sg_status_list","created_at"],"Camera":["code","sg_status_list","created_at"],"MocapTakeRange":["code","sg_status_list","created_at"],"Sequence":["code","sg_status_list","created_at"],"Level":["code","sg_status_list","created_at"],"Episode":["code","sg_status_list","created_at"]},"entity_fields_fixed":{"Asset":["code","description","sg_status_list"],"Shot":["code","description","sg_status_list"],"Task":["content","sg_status_list","due_date","task_assignees","task_reviewers"],"Scene":["code","description","sg_status_list"],"Element":["code","description","sg_status_list"],"Release":["code","description","sg_status_list"],"ShootDay":["code","description","sg_status_list"],"MocapTake":["code","description","sg_status_list"],"MocapSetup":["code","description","sg_status_list"],"Camera":["code","description","sg_status_list"],"MocapTakeRange":["code","description","sg_status_list"],"Sequence":["code","description","sg_status_list"],"Level":["code","description","sg_status_list"],"Episode":["code","description","sg_status_list"]}}' # noqa
+        }
+        self.assertEqual(expected, resp)
+
+        # all filtered
+        resp = self.sg.preferences_read(['date_component_order', 'support_local_storage'])
+
+        expected = {
+            'date_component_order': 'month_day',
+            'support_local_storage': False
+        }
+        self.assertEqual(expected, resp)
+
+        # all filtered with invalid pref
+        resp = self.sg.preferences_read(['date_component_order', 'support_local_storage', 'email_notifications'])
+
+        expected = {
+            'date_component_order': 'month_day',
+            'support_local_storage': False
+        }
+        self.assertEqual(expected, resp)
+
 
 class TestDataTypes(base.LiveTestBase):
     '''Test fields representing the different data types mapped on the server side.
@@ -1529,18 +1727,18 @@ class TestFollow(base.LiveTestBase):
             [["id","is",self.task["id"]]],
             ["project.Project.id"])["project.Project.id"]
         project_count = 2 if shot_project_id == task_project_id else 1
-        result = self.sg.following(self.human_user, 
+        result = self.sg.following(self.human_user,
             project={"type":"Project", "id":shot_project_id})
         self.assertEqual( project_count, len(result) )
-        result = self.sg.following(self.human_user, 
+        result = self.sg.following(self.human_user,
             project={"type":"Project", "id":task_project_id})
         self.assertEqual( project_count, len(result) )
-        result = self.sg.following(self.human_user, 
-            project={"type":"Project", "id":shot_project_id}, 
+        result = self.sg.following(self.human_user,
+            project={"type":"Project", "id":shot_project_id},
             entity_type="Shot")
         self.assertEqual( 1, len(result) )
-        result = self.sg.following(self.human_user, 
-            project={"type":"Project", "id":task_project_id}, 
+        result = self.sg.following(self.human_user,
+            project={"type":"Project", "id":task_project_id},
             entity_type="Task")
         self.assertEqual( 1, len(result) )
 
@@ -1580,6 +1778,10 @@ class TestErrors(base.TestBase):
 
         sg = shotgun_api3.Shotgun(server_url, login=login, password='not a real password')
         self.assertRaises(shotgun_api3.AuthenticationFault, sg.find_one, 'Shot',[])
+
+        # This may trigger an account lockdown. Make sure it is not locked anymore.
+        user = self.sg.find_one("HumanUser", [["login", "is", login]])
+        self.sg.update("HumanUser", user["id"], {"locked_until": None})
 
     @patch('shotgun_api3.shotgun.Http.request')
     def test_status_not_200(self, mock_request):
@@ -1683,7 +1885,7 @@ class TestErrors(base.TestBase):
         path = os.path.abspath(os.path.expanduser(os.path.join(this_dir,"empty.txt")))
         self.assertRaises(shotgun_api3.ShotgunError, self.sg.upload, 'Version', 123, path)
         self.assertRaises(shotgun_api3.ShotgunError, self.sg.upload_thumbnail, 'Version', 123, path)
-        self.assertRaises(shotgun_api3.ShotgunError, self.sg.upload_filmstrip_thumbnail, 'Version', 
+        self.assertRaises(shotgun_api3.ShotgunError, self.sg.upload_filmstrip_thumbnail, 'Version',
                           123, path)
 
     def test_upload_missing_file(self):
@@ -1693,7 +1895,7 @@ class TestErrors(base.TestBase):
         path = "/path/to/nowhere/foo.txt"
         self.assertRaises(shotgun_api3.ShotgunError, self.sg.upload, 'Version', 123, path)
         self.assertRaises(shotgun_api3.ShotgunError, self.sg.upload_thumbnail, 'Version', 123, path)
-        self.assertRaises(shotgun_api3.ShotgunError, self.sg.upload_filmstrip_thumbnail, 'Version', 
+        self.assertRaises(shotgun_api3.ShotgunError, self.sg.upload_filmstrip_thumbnail, 'Version',
                           123, path)
 
 #    def test_malformed_response(self):
@@ -2507,7 +2709,7 @@ def _has_unicode(data):
 
 def _get_path(url):
     """Returns path component of a url without the sheme, host, query, anchor, or any other
-    additional elements. 
+    additional elements.
     For example, the url "https://foo.shotgunstudio.com/page/2128#Shot_1190_sr10101_034"
     returns "/page/2128"
     """
