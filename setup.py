@@ -31,6 +31,7 @@ shotgun_software_version = "3.0.32"
 # versionning of the rodeo internal updates
 rodeo_version = "rdo.1.0.0"
 
+
 setup(
     name="shotgun_api3",
     version="3.3.4" + "+{0}".format(package._rdoVersion),
@@ -45,4 +46,5 @@ setup(
     include_package_data=True,
     package_data={"": ["cacerts.txt", "cacert.pem"]},
     zip_safe=False,
+    python_requires=">2.6,<3",
 )
