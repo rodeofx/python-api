@@ -4,21 +4,56 @@ Shotgun Python API Changelog
 
 Here you can see the full list of changes between each Python API release.
 
-v3.0.33.dev (TBD)
-=================
+v3.0.40 (2019 March 13)
+=====================
+- Updates encoding method to use shutil when uploading, to avoid memory and overflow errors when reading large files. (contributed by @eestrada)
+
+v3.0.39 (2019 February 20)
+=====================
+- Ensures the certificates packaged with the API and those specified via the `SHOTGUN_API_CACERTS` environment variable
+  are used when uploading a file.
+
+v3.0.39 (2019 February 7)
+=====================
+- Upgrades the version of ``httplib2`` to ``0.12.0``, which fixes SNI issues. Note this
+  version contains a more recent list of certificate authorities. If you are running Shotgun locally and have
+  signed your https certificate with an outdated certificate authority, the Shotgun connection will be rejected.
+
+v3.0.37 (2018 July 19)
+=====================
+
+- Proper support added for unicode and utf-8 string paths given to upload methods, and a sane error is raised when an unusable string encoding is used.
+- Adds support for querying preferences from Shotgun via the new preferences_read method.
+- Under-the-hood changes to add support for direct to s3 uploads to Shotgun. This change should be transparent to users.
+
+v3.0.36 (2018 April 3)
+=====================
+
+- Fixes an error where ``connect=False`` during ``__init__`` would still connect to Shotgun.
+- Adds support for ``SHOTGUN_API_CACERTS`` when uploading and downloading files.
+- Properly handles failed downloads due to malware scanning.
+
+v3.0.35 (2017 December 8)
+=====================
+
+- Add exception UserCredentialsNotAllowedForSSOAuthenticationFault.
+  Triggered when attempting to initiate a connection with a username/password
+  pair on an SSO-enabled Shotgun site.
+
+v3.0.34 (2017 September 18)
+=====================
+
+- Optimized pagination strategy for Shotgun 7.4+
+- Switched from a hard-coded value of 500 for "records_per_page" to a server-defined value. We will be experimenting with higher values with the goal of increasing performance for large result sets.
+
+v3.0.33 (2017 July 18)
+=====================
 
 - Raise an exception when uploading an empty file using :meth:`upload`, :meth:`upload_thumbnail` 
   or :meth:`upload_filmstrip_thumbnail` before calling out to the server.
-- Multiple enhancements and bugfixes to Mockgun:
-   - Added support for filters using the `filter_operator` syntax.
-   - `is` and `is_not` comparisons with an entity or multi-entity field set to `None` are now handled.
-   - Fixed contains operator on strings.
-   - Fixed entity link comparisons with `None`.
-   - Added support for dotted notation in find parameters (e.g. `users.HumanUser.login`) on both entity and multi-entity fields.
-   - Added unit tests for Mockgun in `test_mockgun.py`. The tests currently cover all the fixes and features mentionned above.
-   - Schemas are written using pickle's highest protocol as of Python 2.4's release, which speeds up the loading from disk.
-   - The current schema is cached in memory so it can be reused without having to do back to disk.
-- TBD
+- Multiple enhancements and bugfixes to Mockgun
+- Added ``nav_search_string()`` and ``nav_search_entity()`` methods as experimental, internal methods for querying SG hierarchy.
+- Introduces a :meth:`following` query method, that accepts a user entity and optionally an entity type and/or project.
 
 v3.0.32 (2016 Sep 22)
 =====================

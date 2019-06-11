@@ -4,6 +4,7 @@ need a live server to run against."""
 
 import base64
 import datetime
+import urllib
 import re
 try:
     import simplejson as json
@@ -132,11 +133,6 @@ class TestShotgunClient(base.MockTestBase):
         self.assertRaises(api.Fault, self.sg.delete, "FakeType", 1)
         self.assertEqual(my_uuid, auth_args()["session_uuid"])
 
-    def test_config(self):
-        """Client config can be created"""
-        x = api.shotgun._Config()
-        self.assertTrue(x is not None)
-
     def test_url(self):
         """Server url is parsed correctly"""
         login    = self.human_user['login']
@@ -152,7 +148,7 @@ class TestShotgunClient(base.MockTestBase):
         # login:password@domain
         auth_url = "%s%s@%s" % (self.uri_prefix, login_password, self.domain)
         sg = api.Shotgun(auth_url, None, None, connect=False)
-        expected = "Basic " + base64.encodestring(login_password).strip()
+        expected = "Basic " + base64.encodestring(urllib.unquote(login_password)).strip()
         self.assertEqual(expected, sg.config.authorization)
 
     def test_authorization(self):
@@ -172,7 +168,7 @@ class TestShotgunClient(base.MockTestBase):
         args, _ = self.sg._http_request.call_args
         verb, path, body, headers = args
 
-        expected = "Basic " + base64.encodestring(login_password).strip()
+        expected = "Basic " + base64.encodestring(urllib.unquote(login_password)).strip()
         self.assertEqual(expected, headers.get("Authorization"))
 
     def test_user_agent(self):
