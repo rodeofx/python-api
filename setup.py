@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-raise DeprecationWarning('Use rez-build to build this package at Rodeo.')
-# following code is kept for compatibility with shotgun software version.
-
 import sys
 from setuptools import setup, find_packages
+
+import package
 
 f = open('README.md')
 readme = f.read().strip()
@@ -17,9 +16,11 @@ if (sys.version_info[0] <= 2) or (sys.version_info[0] == 2 and sys.version_info[
     if 'install' in script_args and '--no-compile' not in script_args:
         script_args.append('--no-compile')
 
+
 setup(
     name='shotgun_api3',
-    version='3.0.40',
+    # The + is part of the python packaging specification. It means it's a local version.
+    version='3.0.40' + '+{0}'.format(package._rdoVersion),
     description='Shotgun Python API ',
     long_description=readme,
     author='Shotgun Software, RodeoFX',
@@ -31,4 +32,5 @@ setup(
     include_package_data=True,
     package_data={'': ['cacerts.txt']},
     zip_safe=False,
+    python_requires='>2.6,<3',
 )
