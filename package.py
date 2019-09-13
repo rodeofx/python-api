@@ -2,7 +2,7 @@
 """Shotgun_api3"""
 name = 'shotgun_api3'
 
-_shotgunSoftwareVersion = '3.0.40'
+_shotgunSoftwareVersion = '3.1.1'
 _rdoVersion = '1.0.0'
 version = '{0}-rdo-{1}'.format(_shotgunSoftwareVersion, _rdoVersion)
 
