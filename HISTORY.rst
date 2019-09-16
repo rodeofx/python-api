@@ -4,6 +4,18 @@ Shotgun Python API Changelog
 
 Here you can see the full list of changes between each Python API release.
 
+v3.1.1 (2019 August 29)
+=====================
+- Fixes a regression on Python 2.7.0-2.7.9 on Windows with the mimetypes module.
+
+v3.1.0 (2019 July 29)
+=====================
+- Adds support for Python 3.7
+
+v3.0.41 (2019 June 28)
+=====================
+- Adds an optional sleep between retries specified via the `SHOTGUN_API_RETRY_INTERVAL` environment variable, or by setting `sg.config.rpc_attempt_interval`.
+
 v3.0.40 (2019 March 13)
 =====================
 - Updates encoding method to use shutil when uploading, to avoid memory and overflow errors when reading large files. (contributed by @eestrada)

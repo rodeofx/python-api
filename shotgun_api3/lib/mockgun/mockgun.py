@@ -87,11 +87,11 @@ exactly like the real Shotgun one:
     sg = mockgun.Shotgun("https://mysite.shotgunstudio.com", script_name="xyz", api_key="abc")
 
     # now you can start putting stuff in
-    print sg.create("HumanUser", {"firstname": "John", "login": "john"})
+    print(sg.create("HumanUser", {"firstname": "John", "login": "john"}))
     # prints {'login': 'john', 'type': 'HumanUser', 'id': 1, 'firstname': 'John'}
 
     # and find what you have created
-    print sg.find("HumanUser", [["login", "is", "john"]])
+    print(sg.find("HumanUser", [["login", "is", "john"]]))
     prints [{'type': 'HumanUser', 'id': 1}]
 
 That's it! Mockgun is used to run the Shotgun Pipeline Toolkit unit test rig.
@@ -120,6 +120,7 @@ from ... import ShotgunError
 from ...shotgun import _Config
 from .errors import MockgunError
 from .schema import SchemaFactory
+from .. import six
 
 # ----------------------------------------------------------------------------
 # Version
@@ -492,15 +493,15 @@ class Shotgun(object):
                                    "currency": float,
                                    "checkbox": bool,
                                    "percent": int,
-                                   "text": basestring,
+                                   "text": six.string_types,
                                    "serializable": dict,
                                    "date": basestring,
                                    "date_time": datetime.datetime,
-                                   "duration": int,
-                                   "list": basestring,
-                                   "status_list": basestring,
+                                   "duration": six.string_types,
+                                   "list": six.string_types,
+                                   "status_list": six.string_types,
                                    "url": dict,
-                                   "entity_type": basestring}[sg_type]
+                                   "entity_type": six.string_types}[sg_type]
                 except KeyError:
                     raise ShotgunError(
                         "Field %s.%s: Handling for Shotgun type %s is not implemented" %
@@ -610,6 +611,8 @@ class Shotgun(object):
                 return lval.startswith(rval)
             elif operator == "ends_with":
                 return lval.endswith(rval)
+            elif operator == "not_in":
+                return lval not in rval
         elif field_type == "entity":
             if operator == "is":
                 # If one of the two is None, ensure both are.
