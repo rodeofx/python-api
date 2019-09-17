@@ -495,7 +495,7 @@ class Shotgun(object):
                                    "percent": int,
                                    "text": six.string_types,
                                    "serializable": dict,
-                                   "date": basestring,
+                                   "date": six.string_types,
                                    "date_time": datetime.datetime,
                                    "duration": six.string_types,
                                    "list": six.string_types,
