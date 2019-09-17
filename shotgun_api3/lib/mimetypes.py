@@ -30,9 +30,7 @@ versions 2.7.0 - 2.7.9, which included a broken version of the mimetypes module.
 import os
 import sys
 import posixpath
-
-from six.moves.urllib.parse import urlparse
-
+import urllib
 try:
     import _winreg
 except ImportError:
@@ -117,10 +115,7 @@ class MimeTypes:
         Optional `strict' argument when False adds a bunch of commonly found,
         but non-standard types.
         """
-        parseResult = urlparse(url)
-        scheme = parseResult.scheme
-        url = parseResult.netloc + parseResult.path
-
+        scheme, url = urllib.splittype(url)
         if scheme == 'data':
             # syntax of data URLs:
             # dataurl   := "data:" [ mediatype ] [ ";base64" ] "," data
