@@ -30,7 +30,6 @@ versions 2.7.0 - 2.7.9, which included a broken version of the mimetypes module.
 import os
 import sys
 import posixpath
-import urllib
 import urllib.parse
 try:
     import _winreg
