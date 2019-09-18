@@ -10,7 +10,7 @@ authors = ['shotgundev@rodeofx.com']
 
 description = 'Fork of the python api of shotgun.'
 
-requires = ['python-2.6+<3']
+requires = ['python-2.6|2.7|3.7+']
 
 private_build_requires = ['rdo_package_utils']
 
