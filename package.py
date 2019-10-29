@@ -3,7 +3,7 @@
 name = 'shotgun_api3'
 
 _shotgunSoftwareVersion = '3.1.1'
-_rdoVersion = '1.0.0'
+_rdoVersion = '1.1.0'
 version = '{0}-rdo-{1}'.format(_shotgunSoftwareVersion, _rdoVersion)
 
 authors = ['shotgundev@rodeofx.com']
