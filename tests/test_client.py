@@ -440,7 +440,7 @@ class TestShotgunClient(base.MockTestBase):
         self.assertEqual(
             self.sg.MAX_ATTEMPTS,
             self.sg._http_request.call_count,
-            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times",
+            "Call is repeated up to {} times".format(self.sg.MAX_ATTEMPTS),
         )
 
         # 504
@@ -451,7 +451,7 @@ class TestShotgunClient(base.MockTestBase):
         self.assertEqual(
             self.sg.MAX_ATTEMPTS,
             self.sg._http_request.call_count,
-            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times",
+            "Call is repeated up to {} times".format(self.sg.MAX_ATTEMPTS),
         )
 
     def test_upload_s3_503(self):
@@ -474,7 +474,8 @@ class TestShotgunClient(base.MockTestBase):
         # Test the max retries attempt
         self.assertTrue(
             self.sg.MAX_ATTEMPTS == self.sg._make_upload_request.call_count,
-            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times")
+            "Call is repeated up to {} times".format(self.sg.MAX_ATTEMPTS),
+        )
     
     def test_upload_s3_500(self):
         """
@@ -497,7 +498,8 @@ class TestShotgunClient(base.MockTestBase):
         # Test the max retries attempt
         self.assertTrue(
             self.sg.MAX_ATTEMPTS == self.sg._make_upload_request.call_count,
-            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times")
+            "Call is repeated up to {} times".format(self.sg.MAX_ATTEMPTS),
+        )
     
     def test_upload_s3_urlerror__get_attachment_upload_info(self):
         """
@@ -520,7 +522,7 @@ class TestShotgunClient(base.MockTestBase):
         self.assertEqual(
             self.sg.MAX_ATTEMPTS,
             mock_opener.return_value.open.call_count,
-            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times"
+            "Call is repeated up to {} times".format(self.sg.MAX_ATTEMPTS),
         )
 
         # Test the exception message
@@ -554,7 +556,7 @@ class TestShotgunClient(base.MockTestBase):
         self.assertEqual(
             self.sg.MAX_ATTEMPTS,
             self.sg._make_upload_request.call_count,
-            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times"
+            "Call is repeated up to {} times".format(self.sg.MAX_ATTEMPTS),
         )
 
         # Test the exception message

@@ -29,7 +29,7 @@
 """
 
 
-def ensure_binary(s, encoding='utf-8', errors='strict'):
+def ensure_binary(s, encoding="utf-8", errors="strict"):
     """
     Coerce **s** to bytes.
 
@@ -41,22 +41,22 @@ def ensure_binary(s, encoding='utf-8', errors='strict'):
     elif isinstance(s, bytes):
         return s
     else:
-        raise TypeError(f"not expecting type '{type(s)}'")
-    
+        raise TypeError("not expecting type '{}'".format(type(s)))
 
-def ensure_str(s, encoding='utf-8', errors='strict'):
+
+def ensure_str(s, encoding="utf-8", errors="strict"):
     """Coerce *s* to `str`.
 
-      - `str` -> `str`
-      - `bytes` -> decoded to `str`
+    - `str` -> `str`
+    - `bytes` -> decoded to `str`
     """
     if isinstance(s, str):
         return s
 
-    elif isinstance(s, bytes): 
+    elif isinstance(s, bytes):
         return s.decode(encoding, errors)
- 
-    raise TypeError(f"not expecting type '{type(s)}'")
+
+    raise TypeError("not expecting type '{}'".format(type(s)))
 
 
 ensure_text = ensure_str

@@ -1917,7 +1917,7 @@ class TestErrors(base.TestBase):
             log_content = "\n".join(cm1.output)
             for i in [1,2]:
                 self.assertIn(
-                    f"Request failed, attempt {i} of 3.  Retrying",
+                    "Request failed, attempt {} of 3.  Retrying".format(i),
                     log_content,
                 )
             self.assertIn(
@@ -2553,9 +2553,9 @@ class TestNoteThreadRead(base.LiveTestBase):
 
         d = self.sg.find_one("Note",
                              [["id", "is", note["id"]]],
-                             ["created_by", f"created_by.{user_entity}.image"])
+                             ["created_by", "created_by.{}.image".format(user_entity)])
 
-        current_thumbnail = d[f"created_by.{user_entity}.image"]
+        current_thumbnail = d["created_by.{}.image".format(user_entity)]
 
         if current_thumbnail is None:
             # upload thumbnail
@@ -2565,9 +2565,9 @@ class TestNoteThreadRead(base.LiveTestBase):
 
             d = self.sg.find_one("Note",
                                  [["id", "is", note["id"]]],
-                                 ["created_by", f"created_by.{user_entity}.image"])
+                                 ["created_by", "created_by.{}.image".format(user_entity)])
 
-            current_thumbnail = d[f"created_by.{user_entity}.image"]
+            current_thumbnail = d["created_by.{}.image".format(user_entity)]
 
         # get thread
         result = self.sg.note_thread_read(note["id"])
