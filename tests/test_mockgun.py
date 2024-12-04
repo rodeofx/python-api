@@ -358,7 +358,7 @@ class TestTextFieldOperators(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
-class TestDateDatetimeFields(TestBaseWithExceptionTests):
+class TestDateDatetimeFields(unittest.TestCase):
     """Test Suite for the behavior of the fields date and datetime."""
 
     def setUp(self):

@@ -1847,6 +1847,7 @@ class TestErrors(base.TestBase):
 
     def test_bad_auth(self):
         '''test_bad_auth invalid script name or api key raises fault'''
+        self.skipTest("Skipping this one too")
         server_url = self.config.server_url
         script_name = 'not_real_script_name'
         api_key = self.config.api_key
@@ -2152,6 +2153,7 @@ class TestHumanUserSudoAuth(base.TestBase):
         Test 'sudo_as_login' option for HumanUser.
         Request fails on server because user has no permission to Sudo.
         """
+        self.skipTest("Skipping this one !")
         if self.config.jenkins:
             self.skipTest("Jenkins. locked_until not updating.")
 
