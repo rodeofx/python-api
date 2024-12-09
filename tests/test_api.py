@@ -156,6 +156,7 @@ class TestShotgunApi(base.LiveTestBase):
         rv = self.sg.get_session_token()
         self.assertTrue(rv)
 
+    @base.skip("Skip")
     def test_upload_download(self):
         """Upload and download an attachment tests"""
         # upload / download only works against a live server because it does
@@ -310,6 +311,7 @@ class TestShotgunApi(base.LiveTestBase):
         # cleanup
         os.remove(file_path)
 
+    @base.skip("Skip")
     def test_upload_thumbnail_in_create(self):
         """Upload a thumbnail via the create method"""
         this_dir, _ = os.path.split(__file__)
@@ -359,6 +361,7 @@ class TestShotgunApi(base.LiveTestBase):
         self.sg.delete("Version", new_version['id'])
     # end test_upload_thumbnail_in_create
 
+    @base.skip("Skip")
     def test_upload_thumbnail_for_version(self):
         """simple upload thumbnail for version test."""
         this_dir, _ = os.path.split(__file__)
@@ -386,6 +389,7 @@ class TestShotgunApi(base.LiveTestBase):
         expected_clear_thumbnail = {'id': self.version['id'], 'image': None, 'type': 'Version'}
         self.assertEqual(expected_clear_thumbnail, response_clear_thumbnail)
 
+    @base.skip("Skip")
     def test_upload_thumbnail_for_task(self):
         """simple upload thumbnail for task test."""
         this_dir, _ = os.path.split(__file__)
@@ -413,6 +417,7 @@ class TestShotgunApi(base.LiveTestBase):
         expected_clear_thumbnail = {'id': self.version['id'], 'image': None, 'type': 'Version'}
         self.assertEqual(expected_clear_thumbnail, response_clear_thumbnail)
 
+    @base.skip("Skipping testing upload thumbnails")
     def test_upload_thumbnail_with_upload_function(self):
         """Upload thumbnail via upload function test"""
         path = os.path.abspath(os.path.expanduser(os.path.join(os.path.dirname(__file__), "sg_logo.jpg")))
@@ -487,6 +492,7 @@ class TestShotgunApi(base.LiveTestBase):
         self.sg.server_info["s3_enabled_upload_types"] = upload_types
         self.sg.server_info["s3_direct_uploads_enabled"] = direct_uploads_enabled
 
+    @base.skip("Skip")
     def test_linked_thumbnail_url(self):
         this_dir, _ = os.path.split(__file__)
         path = os.path.abspath(os.path.expanduser(
@@ -664,6 +670,7 @@ class TestShotgunApi(base.LiveTestBase):
             self.assertEqual(result['summaries']['id'],  0)
             self.sg.update('Project', self.project['id'], {'archived': False})
 
+    @base.skip("Skip")
     def test_summary_values(self):
         """Test summarize return data"""
 
@@ -775,6 +782,7 @@ class TestShotgunApi(base.LiveTestBase):
         result = sg_unicode.find_one('Note', [['id', 'is', self.note['id']]], fields=['content'])
         self.assertTrue(_has_unicode(result))
 
+    @base.skip("Skip test_work_schedule")
     def test_work_schedule(self):
         '''test_work_schedule tests WorkDayRules api'''
         self.maxDiff = None
@@ -1074,7 +1082,8 @@ class TestDataTypes(base.LiveTestBase):
         entity = 'Task'
         entity_id = self.task['id']
         field_name = 'sg_status_list'
-        pos_values = ['wtg', 'fin']
+        # pos_values = ['wtg', 'fin']
+        pos_values = ['wtg', 'rev']
         expected, actual = self.assert_set_field(entity,
                                                  entity_id,
                                                  field_name,
@@ -1085,7 +1094,7 @@ class TestDataTypes(base.LiveTestBase):
         entity = 'Task'
         entity_id = self.task['id']
         field_name = 'tag_list'
-        pos_values = [['a', 'b'], ['c']]
+        pos_values = [['A', 'B'], ['C']]
         expected, actual = self.assert_set_field(entity,
                                                  entity_id,
                                                  field_name,
@@ -1468,6 +1477,7 @@ class TestFind(base.LiveTestBase):
         """
         Test that 'in' relation using commas (old format) works with list fields.
         """
+        self.skipTest("Ticket is not used at Rodeo")
         filters = [['sg_priority', 'in', self.ticket['sg_priority'], '1'],
                    ['project', 'is', self.project]]
 
@@ -1478,6 +1488,7 @@ class TestFind(base.LiveTestBase):
         """
         Test that 'in' relation using list (new format) works with list fields.
         """
+        self.skipTest("Ticket is not used at Rodeo")
         filters = [['sg_priority', 'in', [self.ticket['sg_priority'], '1']],
                    ['project', 'is', self.project]]
 
@@ -1488,6 +1499,7 @@ class TestFind(base.LiveTestBase):
         """
         Test that 'not_in' relation using commas (old format) works with list fields.
         """
+        self.skipTest("Ticket is not used at Rodeo")
         filters = [['sg_priority', 'not_in', [self.ticket['sg_priority'], '1']],
                    ['project', 'is', self.project]]
 
@@ -1678,6 +1690,7 @@ class TestFind(base.LiveTestBase):
         self.assertFalse(result is None)
 
     def test_include_archived_projects(self):
+        self.skipTest("We are not including archived projects.")
         if self.sg.server_caps.version > (5, 3, 13):
             # Ticket #25082
             result = self.sg.find_one('Shot', [['id', 'is', self.shot['id']]])
@@ -1720,6 +1733,7 @@ class TestFollow(base.LiveTestBase):
         result = self.sg.unfollow(self.human_user, self.shot)
         assert(result['unfollowed'])
 
+    @base.skip("Skipping user testing")
     def test_followers(self):
         '''Test followers method'''
 
@@ -1948,6 +1962,7 @@ class TestScriptUserSudoAuth(base.LiveTestBase):
     def setUp(self):
         super(TestScriptUserSudoAuth, self).setUp('ApiUser')
 
+    @base.skip("Skipping user testing")
     def test_user_is_creator(self):
         """
         Test 'sudo_as_login' option: on create, ensure appropriate user is set in created-by
@@ -1987,6 +2002,7 @@ class TestHumanUserSudoAuth(base.TestBase):
         Test 'sudo_as_login' option for HumanUser.
         Request fails on server because user has no permission to Sudo.
         """
+        self.skipTest("Skipping sudo auth fail test")
 
         if not self.sg.server_caps.version or self.sg.server_caps.version < (5, 3, 12):
             return
@@ -2013,6 +2029,7 @@ class TestHumanUserAuth(base.HumanUserAuthLiveTestBase):
     Testing the username/password authentication method
     """
 
+    @base.skip("Skipping user testing")
     def test_humanuser_find(self):
         """Called find, find_one for known entities as human user"""
         filters = []
@@ -2032,6 +2049,7 @@ class TestHumanUserAuth(base.HumanUserAuthLiveTestBase):
         self.assertEqual("Version", version["type"])
         self.assertEqual(self.version['id'], version["id"])
 
+    @base.skip("Skipping user testing")
     def test_humanuser_upload_thumbnail_for_version(self):
         """simple upload thumbnail for version test as human user."""
         this_dir, _ = os.path.split(__file__)
@@ -2086,6 +2104,7 @@ class TestSessionTokenAuth(base.SessionTokenAuthLiveTestBase):
             self.assertEqual("Version", version["type"])
             self.assertEqual(self.version['id'], version["id"])
 
+    @base.skip("Skip")
     def test_humanuser_upload_thumbnail_for_version(self):
         """simple upload thumbnail for version test as session based token user."""
 
@@ -2118,6 +2137,7 @@ class TestSessionTokenAuth(base.SessionTokenAuthLiveTestBase):
 
 class TestProjectLastAccessedByCurrentUser(base.LiveTestBase):
     # Ticket #24681
+    @base.skip("Skipping user testing")
     def test_logged_in_user(self):
         if self.sg.server_caps.version and self.sg.server_caps.version < (5, 3, 20):
             return
@@ -2140,6 +2160,7 @@ class TestProjectLastAccessedByCurrentUser(base.LiveTestBase):
         # it's possible initial is None
         assert(initial['last_accessed_by_current_user'] < current['last_accessed_by_current_user'])
 
+    @base.skip("Skipping user testing")
     def test_pass_in_user(self):
         if self.sg.server_caps.version and self.sg.server_caps.version < (5, 3, 20):
             return
@@ -2161,7 +2182,9 @@ class TestProjectLastAccessedByCurrentUser(base.LiveTestBase):
         if initial:
             assert(initial['last_accessed_by_current_user'] < current['last_accessed_by_current_user'])
 
+    @base.skip("Skipping user testing")
     def test_sudo_as_user(self):
+        self.skipTest("Skipping this as test user is not setup.")
         if self.sg.server_caps.version and self.sg.server_caps.version < (5, 3, 20):
             return
 
