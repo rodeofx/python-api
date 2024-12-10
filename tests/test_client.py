@@ -12,11 +12,11 @@
 CRUD functions. These tests always use a mock http connection so not not
 need a live server to run against."""
 
-import base64
 import datetime
-from shotgun_api3.lib.six.moves import urllib
 import os
 import re
+
+from shotgun_api3.lib.six.moves import urllib
 from shotgun_api3.lib import six
 try:
     import simplejson as json
@@ -37,9 +37,14 @@ import shotgun_api3 as api
 from shotgun_api3.shotgun import ServerCapabilities, SG_TIMEZONE
 from . import base
 
+if six.PY3:
+    from base64 import encodebytes as base64encode
+else:
+    from base64 import encodestring as base64encode
+
 
 def b64encode(val):
-    return base64.encodestring(six.ensure_binary(val)).decode("utf-8")
+    return base64encode(six.ensure_binary(val)).decode("utf-8")
 
 
 class TestShotgunClient(base.MockTestBase):
@@ -164,6 +169,60 @@ class TestShotgunClient(base.MockTestBase):
         expected = "Basic " + b64encode(urllib.parse.unquote(login_password)).strip()
         self.assertEqual(expected, sg.config.authorization)
 
+    def test_b64encode(self):
+        """Parse value using the proper encoder."""
+        login = "thelogin"
+        password = "%thepassw0r#$"
+        login_password = "%s:%s" % (login, password)
+        expected = 'dGhlbG9naW46JXRoZXBhc3N3MHIjJA=='
+        result = b64encode(urllib.parse.unquote(login_password)).strip()
+        self.assertEqual(expected, result)
+
+    def test_read_config(self):
+        """Validate that config values are properly coerced."""
+        this_dir = os.path.dirname(os.path.realpath(__file__))
+        config_path = os.path.join(this_dir, "test_config_file")
+        config = base.ConfigParser()
+        config.read(config_path)
+        result = config.get("SERVER_INFO", "api_key")
+        expected = "%abce"
+
+        self.assertEqual(expected, result)
+
+    def test_split_url(self):
+        """Validate that url parts are properly extracted."""
+
+        sg = api.Shotgun("https://ci.shotgunstudio.com",
+                         "foo", "bar", connect=False)
+
+        base_url = "https://ci.shotgunstudio.com"
+        expected_server = "ci.shotgunstudio.com"
+        expected_auth = None
+        auth, server = sg._split_url(base_url)
+        self.assertEqual(auth, expected_auth)
+        self.assertEqual(server, expected_server)
+
+        base_url = "https://ci.shotgunstudio.com:9500"
+        expected_server = "ci.shotgunstudio.com:9500"
+        expected_auth = None
+        auth, server = sg._split_url(base_url)
+        self.assertEqual(auth, expected_auth)
+        self.assertEqual(server, expected_server)
+
+        base_url = "https://x:y@ci.shotgunstudio.com:9500"
+        expected_server = "ci.shotgunstudio.com:9500"
+        expected_auth = "x:y"
+        auth, server = sg._split_url(base_url)
+        self.assertEqual(auth, expected_auth)
+        self.assertEqual(server, expected_server)
+
+        base_url = "https://12345XYZ@ci.shotgunstudio.com:9500"
+        expected_server = "ci.shotgunstudio.com:9500"
+        expected_auth = "12345XYZ"
+        auth, server = sg._split_url(base_url)
+        self.assertEqual(auth, expected_auth)
+        self.assertEqual(server, expected_server)
+
     def test_authorization(self):
         """Authorization passed to server"""
         login = self.human_user['login']
@@ -183,6 +242,28 @@ class TestShotgunClient(base.MockTestBase):
 
         expected = "Basic " + b64encode(urllib.parse.unquote(login_password)).strip()
         self.assertEqual(expected, headers.get("Authorization"))
+
+    def test_localization_header_default(self):
+        """Localization header not passed to server without explicitly setting SG localization config to True"""
+        self.sg.info()
+
+        args, _ = self.sg._http_request.call_args
+        (_, _, _, headers) = args
+        expected_header_value = "auto"
+
+        self.assertEqual(None, headers.get("locale"))
+
+    def test_localization_header_when_localized(self):
+        """Localization header passed to server when setting SG localization config to True"""
+        self.sg.config.localized = True
+
+        self.sg.info()
+
+        args, _ = self.sg._http_request.call_args
+        (_, _, _, headers) = args
+        expected_header_value = "auto"
+
+        self.assertEqual("auto", headers.get("locale"))
 
     def test_user_agent(self):
         """User-Agent passed to server"""
@@ -348,6 +429,36 @@ class TestShotgunClient(base.MockTestBase):
         rv = self.sg._call_rpc("list", a)
         expected = "rpc response with list result"
         self.assertEqual(d["results"], rv, expected)
+
+        # Test that we raise on a 502. This is ensuring the retries behavior
+        # in place specific to 502 responses still eventually ends up raising.
+        d = {"results": ["foo", "bar"]}
+        a = {"some": "args"}
+        self._mock_http(d, status=(502, "bad gateway"))
+        self.assertRaises(api.ProtocolError, self.sg._call_rpc, "list", a)
+
+    def test_upload_s3(self):
+        """
+        Test 503 response is retried when uploading to S3.
+        """
+        this_dir, _ = os.path.split(__file__)
+        storage_url = "http://foo.com/"
+        path = os.path.abspath(os.path.expanduser(
+            os.path.join(this_dir, "sg_logo.jpg")))
+        max_attempts = 4  # Max retries to S3 server attempts
+        # Expected HTTPError exception error message
+        expected = "The server is currently down or to busy to reply." \
+                   "Please try again later."
+
+        # Test the Internal function that is used to upload each
+        # data part in the context of multi-part uploads to S3, we
+        # simulate the HTTPError exception raised with 503 status errors
+        with self.assertRaises(api.ShotgunError, msg=expected):
+            self.sg._upload_file_to_storage(path, storage_url)
+        # Test the max retries attempt
+        self.assertTrue(
+            max_attempts == self.sg._make_upload_request.call_count,
+            "Call is repeated up to 3 times")
 
     def test_transform_data(self):
         """Outbound data is transformed"""

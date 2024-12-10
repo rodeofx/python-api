@@ -31,6 +31,7 @@ import os
 import sys
 import posixpath
 import urllib
+import urllib.parse
 try:
     import _winreg
 except ImportError:
@@ -115,7 +116,7 @@ class MimeTypes:
         Optional `strict' argument when False adds a bunch of commonly found,
         but non-standard types.
         """
-        scheme, url = urllib.splittype(url)
+        scheme, url = urllib.parse.splittype(url)
         if scheme == 'data':
             # syntax of data URLs:
             # dataurl   := "data:" [ mediatype ] [ ";base64" ] "," data
