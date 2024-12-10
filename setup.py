@@ -12,6 +12,7 @@
 import sys
 from setuptools import setup, find_packages
 
+<<<<<<< HEAD
 f = open("README.md")
 readme = f.read().strip()
 
@@ -27,7 +28,7 @@ if (sys.version_info[0] <= 2) or (
         script_args.append("--no-compile")
 
 # version of the library was into when the fork was done
-shotgun_software_version = "3.0.32"
+shotgun_software_version = "3.3.4"
 # versionning of the rodeo internal updates
 rodeo_version = "rdo.1.0.0"
 
@@ -46,5 +47,4 @@ setup(
     include_package_data=True,
     package_data={"": ["cacerts.txt", "cacert.pem"]},
     zip_safe=False,
-    python_requires=">2.6,<3",
 )
