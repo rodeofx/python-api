@@ -844,8 +844,6 @@ class Shotgun(object):
             field_type = self._get_field_type(entity_type, field)
             if field_type == "entity" and data[field]:
                 row[field] = {"type": data[field]["type"], "id": data[field]["id"]}
-            elif field_type in cases:
-                row[field] = cases[field_type](data)
             else:
                 row[field] = data[field]
 
