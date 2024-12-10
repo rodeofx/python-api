@@ -499,9 +499,11 @@ class Shotgun(object):
                                    "serializable": dict,
                                    "date": six.string_types,
                                    "date_time": datetime.datetime,
+                                   "duration": six.string_types,
                                    "list": six.string_types,
                                    "status_list": six.string_types,
-                                   "url": dict}[sg_type]
+                                   "url": dict,
+                                   "entity_type": six.string_types}[sg_type]
                 except KeyError:
                     raise ShotgunError(
                         "Field %s.%s: Handling for ShotGrid type %s is not implemented" %
