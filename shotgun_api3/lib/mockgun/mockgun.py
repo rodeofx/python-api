@@ -193,13 +193,15 @@ class Shotgun(object):
         # they way they would expect to in the real API.
         self.config = _Config(self)
 
+        self.config.set_server_params(base_url)
+
         # load in the shotgun schema to associate with this Shotgun
         (schema_path, schema_entity_path) = self.get_schema_paths()
 
         if schema_path is None or schema_entity_path is None:
             raise MockgunError("Cannot create Mockgun instance because no schema files have been defined. "
                                "Before creating a Mockgun instance, please call Mockgun.set_schema_paths() "
-                               "in order to specify which Shotgun schema Mockgun should operate against.")
+                               "in order to specify which ShotGrid schema Mockgun should operate against.")
 
         self._schema, self._schema_entity = SchemaFactory.get_schemas(schema_path, schema_entity_path)
 
@@ -504,7 +506,7 @@ class Shotgun(object):
                                    "entity_type": six.string_types}[sg_type]
                 except KeyError:
                     raise ShotgunError(
-                        "Field %s.%s: Handling for Shotgun type %s is not implemented" %
+                        "Field %s.%s: Handling for ShotGrid type %s is not implemented" %
                         (entity_type, field, sg_type)
                     )
 

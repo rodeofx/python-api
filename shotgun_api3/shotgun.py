@@ -35,7 +35,6 @@ from .lib import sgsix
 from .lib.six import BytesIO               # used for attachment upload
 from .lib.six.moves import map
 
-import base64
 from .lib.six.moves import http_cookiejar  # used for attachment upload
 import datetime
 import logging
@@ -56,6 +55,12 @@ from .lib.sgtimezone import SgTimezone
 # Import Error and ResponseError (even though they're unused in this file) since they need
 # to be exposed as part of the API.
 from .lib.six.moves.xmlrpc_client import Error, ProtocolError, ResponseError  # noqa
+
+if six.PY3:
+    from base64 import encodebytes as base64encode
+else:
+    from base64 import encodestring as base64encode
+
 
 LOG = logging.getLogger("shotgun_api3")
 """
@@ -117,7 +122,7 @@ except ImportError as e:
 
 # ----------------------------------------------------------------------------
 # Version
-__version__ = "3.1.1"
+__version__ = "3.3.4"
 
 # ----------------------------------------------------------------------------
 # Errors
@@ -133,6 +138,13 @@ class ShotgunError(Exception):
 class ShotgunFileDownloadError(ShotgunError):
     """
     Exception for file download-related errors.
+    """
+    pass
+
+
+class ShotgunThumbnailNotReady(ShotgunError):
+    """
+    Exception for when trying to use a 'pending thumbnail' (aka transient thumbnail) in an operation
     """
     pass
 
@@ -212,10 +224,10 @@ class ServerCapabilities(object):
         except AttributeError:
             self.version = None
         if not self.version:
-            raise ShotgunError("The Shotgun Server didn't respond with a version number. "
+            raise ShotgunError("The ShotGrid Server didn't respond with a version number. "
                                "This may be because you are running an older version of "
-                               "Shotgun against a more recent version of the Shotgun API. "
-                               "For more information, please contact Shotgun Support.")
+                               "ShotGrid against a more recent version of the ShotGrid API. "
+                               "For more information, please contact ShotGrid Support.")
 
         if len(self.version) > 3 and self.version[3] == "Dev":
             self.is_dev = True
@@ -427,6 +439,31 @@ class _Config(object):
         self.session_token = None
         self.authorization = None
         self.no_ssl_validation = False
+        self.localized = False
+
+    def set_server_params(self, base_url):
+        """
+        Set the different server related fields based on the passed in URL.
+
+        This will impact the following attributes:
+
+        - scheme: http or https
+        - api_path: usually /api3/json
+        - server: usually something.shotgunstudio.com
+
+        :param str base_url: The server URL.
+
+        :raises ValueError: Raised if protocol is not http or https.
+        """
+        self.scheme, self.server, api_base, _, _ = \
+            urllib.parse.urlsplit(base_url)
+        if self.scheme not in ("http", "https"):
+            raise ValueError(
+                "base_url must use http or https got '%s'" % base_url
+            )
+        self.api_path = urllib.parse.urljoin(urllib.parse.urljoin(
+            api_base or "/", self.api_ver + "/"), "json"
+        )
 
     @property
     def records_per_page(self):
@@ -610,32 +647,29 @@ class Shotgun(object):
                              "got '%s'." % self.config.rpc_attempt_interval)
 
         self._connection = None
-        if ca_certs is not None:
-            self.__ca_certs = ca_certs
-        else:
-            self.__ca_certs = os.environ.get("SHOTGUN_API_CACERTS")
+
+        self.__ca_certs = self._get_certs_file(ca_certs)
 
         self.base_url = (base_url or "").lower()
-        self.config.scheme, self.config.server, api_base, _, _ = \
-            urllib.parse.urlsplit(self.base_url)
-        if self.config.scheme not in ("http", "https"):
-            raise ValueError("base_url must use http or https got '%s'" %
-                             self.base_url)
-        self.config.api_path = urllib.parse.urljoin(urllib.parse.urljoin(
-            api_base or "/", self.config.api_ver + "/"), "json")
+        self.config.set_server_params(self.base_url)
 
         # if the service contains user information strip it out
         # copied from the xmlrpclib which turned the user:password into
         # and auth header
-        auth, self.config.server = urllib.parse.splituser(urllib.parse.urlsplit(base_url).netloc)
+
+        # Do NOT self._split_url(self.base_url) here, as it contains the lower
+        # case version of the base_url argument. Doing so would base64encode
+        # the lowercase version of the credentials.
+        auth, self.config.server = self._split_url(base_url)
         if auth:
-            auth = base64.encodestring(six.ensure_binary(urllib.parse.unquote(auth))).decode("utf-8")
+            auth = base64encode(six.ensure_binary(
+                urllib.parse.unquote(auth))).decode("utf-8")
             self.config.authorization = "Basic " + auth.strip()
 
         # foo:bar@123.456.789.012:3456
         if http_proxy:
-            # check if we're using authentication. Start from the end since there might be
-            # @ in the user's password.
+            # check if we're using authentication. Start from the end since
+            # there might be @ in the user's password.
             p = http_proxy.rsplit("@", 1)
             if len(p) > 1:
                 self.config.proxy_user, self.config.proxy_pass = \
@@ -682,6 +716,33 @@ class Shotgun(object):
             self.config.user_login = None
             self.config.user_password = None
             self.config.auth_token = None
+
+    def _split_url(self, base_url):
+        """
+        Extract the hostname:port and username/password/token from base_url
+        sent when connect to the API.
+
+        In python 3.8 `urllib.parse.splituser` was deprecated warning devs to
+        use `urllib.parse.urlparse`.
+        """
+        if six.PY38:
+            auth = None
+            results = urllib.parse.urlparse(base_url)
+            server = results.hostname
+            if results.port:
+                server = "{}:{}".format(server, results.port)
+
+            if results.username:
+                auth = results.username
+
+                if results.password:
+                    auth = "{}:{}".format(auth, results.password)
+
+        else:
+            auth, server = urllib.parse.splituser(
+                urllib.parse.urlsplit(base_url).netloc)
+
+        return auth, server
 
     # ========================================================================
     # API Functions
@@ -746,9 +807,6 @@ class Shotgun(object):
 
         >>> sg.info()
         {'full_version': [8, 2, 1, 0], 'version': [8, 2, 1], 'user_authentication_method': 'default', ...}
-
-        Tokens and values
-        -----------------
 
         ::
 
@@ -1824,6 +1882,9 @@ class Shotgun(object):
             ``{'type': 'Project', 'id': 3}``
         :returns: dict of Entity Type to dict containing the display name.
         :rtype: dict
+
+        .. note::
+            The returned display names for this method will be localized when the ``localize`` Shotgun config property is set to ``True``. See :ref:`localization` for more information.
         """
 
         params = {}
@@ -1893,6 +1954,9 @@ class Shotgun(object):
             types. Properties that are ``'editable': True``, can be updated using the
             :meth:`~shotgun_api3.Shotgun.schema_field_update` method.
         :rtype: dict
+
+        .. note::
+            The returned display names for this method will be localized when the ``localize`` Shotgun config property is set to ``True``. See :ref:`localization` for more information.
         """
 
         params = {}
@@ -1922,6 +1986,9 @@ class Shotgun(object):
 
         .. note::
             If you don't specify a ``project_entity``, everything is reported as visible.
+
+        .. note::
+            The returned display names for this method will be localized when the ``localize`` Shotgun config property is set to ``True``. See :ref:`localization` for more information.
 
         >>> sg.schema_field_read('Asset', 'shots')
         {'shots': {'data_type': {'editable': False, 'value': 'multi_entity'},
@@ -2002,7 +2069,7 @@ class Shotgun(object):
 
         return self._call_rpc("schema_field_create", params)
 
-    def schema_field_update(self, entity_type, field_name, properties):
+    def schema_field_update(self, entity_type, field_name, properties, project_entity=None):
         """
         Update the properties for the specified field on an entity.
 
@@ -2020,7 +2087,16 @@ class Shotgun(object):
         :param field_name: Internal Shotgun name of the field to update.
         :param properties: Dictionary with key/value pairs where the key is the property to be
             updated and the value is the new value.
+        :param dict project_entity: Optional Project entity specifying which project to modify the
+            ``visible`` property for. If ``visible`` is present in ``properties`` and
+            ``project_entity`` is not set, an exception will be raised. Example:
+            ``{'type': 'Project', 'id': 3}``
         :returns: ``True`` if the field was updated.
+
+        .. note::
+            The ``project_entity`` parameter can only affect the state of the ``visible`` property
+            and has no impact on other properties.
+
         :rtype: bool
         """
 
@@ -2032,7 +2108,7 @@ class Shotgun(object):
                 for k, v in six.iteritems((properties or {}))
             ]
         }
-
+        params = self._add_project_param(params, project_entity)
         return self._call_rpc("schema_field_update", params)
 
     def schema_field_delete(self, entity_type, field_name):
@@ -2122,6 +2198,10 @@ class Shotgun(object):
         .. note::
             When sharing a filmstrip thumbnail, it is required to have a static thumbnail in
             place before the filmstrip will be displayed in the Shotgun web UI.
+            If the :ref:`thumbnail is still processing and is using a placeholder 
+            <interpreting_image_field_strings>`, this method will error.
+
+        Simple use case:
 
         >>> thumb = '/data/show/ne2/100_110/anim/01.mlk-02b.jpg'
         >>> e = [{'type': 'Version', 'id': 123}, {'type': 'Version', 'id': 456}]
@@ -2145,6 +2225,8 @@ class Shotgun(object):
             share the static thumbnail. Defaults to ``False``.
         :returns: ``id`` of the Attachment entity representing the source thumbnail that is shared.
         :rtype: int
+        :raises: :class:`ShotgunError` if not supported by server version or improperly called, 
+            or :class:`ShotgunThumbnailNotReady` if thumbnail is still pending.
         """
         if not self.server_caps.version or self.server_caps.version < (4, 0, 0):
             raise ShotgunError("Thumbnail sharing support requires server "
@@ -2208,14 +2290,16 @@ class Shotgun(object):
 
         result = self._send_form(url, params)
 
-        if not result.startswith("1"):
-            raise ShotgunError("Unable to share thumbnail: %s" % result)
-        else:
+        if result.startswith("1:"):
             # clearing thumbnail returns no attachment_id
             try:
                 attachment_id = int(result.split(":", 2)[1].split("\n", 1)[0])
             except ValueError:
                 attachment_id = None
+        elif result.startswith("2"):
+            raise ShotgunThumbnailNotReady("Unable to share thumbnail: %s" % result)
+        else:
+            raise ShotgunError("Unable to share thumbnail: %s" % result)
 
         return attachment_id
 
@@ -2301,6 +2385,10 @@ class Shotgun(object):
         You can optionally store the file in a field on the entity, change the display name, and
         assign tags to the Attachment.
 
+        .. note::
+          Make sure to have retries for file uploads. Failures when uploading will occasionally happen. 
+          When it does, immediately retrying to upload usually works
+
         >>> mov_file = '/data/show/ne2/100_110/anim/01.mlk-02b.mov'
         >>> sg.upload("Shot", 423, mov_file, field_name="sg_latest_quicktime",
         ...           display_name="Latest QT")
@@ -2315,6 +2403,7 @@ class Shotgun(object):
         :param str tag_list: comma-separated string of tags to assign to the file.
         :returns: Id of the Attachment entity that was created for the image.
         :rtype: int
+        :raises: :class:`ShotgunError` on upload failure.
         """
         # Basic validations of the file to upload.
         path = os.path.abspath(os.path.expanduser(path or ""))
@@ -2678,13 +2767,11 @@ class Shotgun(object):
         .. note::
             Support for passing in an int representing the Attachment ``id`` is deprecated
 
-        .. todo::
-            Support for a standard entity hash should be removed: #22150
-
         :returns: the download URL for the Attachment or ``None`` if ``None`` was passed to
             ``attachment`` parameter.
         :rtype: str
         """
+        # TODO: Support for a standard entity hash should be removed: #22150
         attachment_id = None
         if isinstance(attachment, int):
             attachment_id = attachment
@@ -3166,6 +3253,66 @@ class Shotgun(object):
             handlers.append(handler)
         return urllib.request.build_opener(*handlers)
 
+    @classmethod
+    def _get_certs_file(cls, ca_certs):
+        """
+        The following method tells the API where to look for
+        certificate authorities certificates (we will be referring to these
+        as CAC from now on). Here's how the Python API interacts with those.
+
+        Auth and CRUD operations
+        ========================
+        These operations are executed with httplib2. httplib2 ships with a
+        list of CACs instead of asking Python's ssl module for them.
+
+        Upload/Downloads
+        ================
+        These operations are executed using urllib2. urllib2 asks a Python
+        module called `ssl` for CACs. We have bundled certifi with the API
+        so that we can be sure the certs are correct at the time of the API
+        release. This does however mean when the certs change we must update
+        the API to contain the latest certifi.
+        This approach is preferable to not using certifi since, on Windows,
+        ssl searches for CACs in the Windows Certificate Store, on
+        Linux/macOS, it asks the OpenSSL library linked with Python for CACs.
+        Depending on how Python was compiled for a given DCC, Python may be
+        linked against the OpenSSL from the OS or a copy of OpenSSL distributed
+        with the DCC. This impacts which versions of the certificates are
+        available to Python, as an OS level OpenSSL will be aware of system
+        wide certificates that have been added, while an OpenSSL that comes
+        with a DCC is likely bundling a list of certificates that get update
+        with each release and may not contain system wide certificates.
+
+        Using custom CACs
+        =================
+        When a user requires a non-standard CAC, the SHOTGUN_API_CACERTS
+        environment variable allows to provide an alternate location for
+        the CACs.
+
+        :param ca_certs: A default cert can be provided
+        :return: The cert file path to use.
+        """
+        if ca_certs is not None:
+            # certs were provided up front so use these
+            return ca_certs
+        elif "SHOTGUN_API_CACERTS" in os.environ:
+            return os.environ.get("SHOTGUN_API_CACERTS")
+        else:
+            # No certs have been specifically provided fallback to using the
+            # certs shipped with this API.
+            # We bundle certifi with this API so that we have a higher chance
+            # of using an uptodate certificate, rather than relying
+            # on the certs that are bundled with Python or the OS in some cases.
+            # However we can't use certifi.where() since that searches for the
+            # cacert.pem file using the sys.path and this means that if another
+            # copy of certifi can be found first, then it won't use ours.
+            # So we manually generate the path to the cert, but still use certifi
+            # to make it easier for updating the bundled cert with the API.
+            cur_dir = os.path.dirname(os.path.abspath(__file__))
+            # Now add the rest of the path to the cert file.
+            cert_file = os.path.join(cur_dir, "lib", "certifi", "cacert.pem")
+            return cert_file
+
     def _turn_off_ssl_validation(self):
         """
         Turn off SSL certificate validation.
@@ -3211,17 +3358,43 @@ class Shotgun(object):
             "content-type": "application/json; charset=utf-8",
             "connection": "keep-alive"
         }
-        http_status, resp_headers, body = self._make_call("POST", self.config.api_path,
-                                                          encoded_payload, req_headers)
-        LOG.debug("Completed rpc call to %s" % (method))
-        try:
-            self._parse_http_status(http_status)
-        except ProtocolError as e:
-            e.headers = resp_headers
-            # 403 is returned with custom error page when api access is blocked
-            if e.errcode == 403:
-                e.errmsg += ": %s" % body
-            raise
+
+        if self.config.localized is True:
+            req_headers["locale"] = "auto"
+
+        attempt = 1
+        max_attempts = 4 # Three retries on failure
+        backoff = 0.75 # Seconds to wait before retry, times the attempt number
+
+        while attempt <= max_attempts:
+            http_status, resp_headers, body = self._make_call(
+                "POST",
+                self.config.api_path,
+                encoded_payload,
+                req_headers,
+            )
+
+            LOG.debug("Completed rpc call to %s" % (method))
+
+            try:
+                self._parse_http_status(http_status)
+            except ProtocolError as e:
+                e.headers = resp_headers
+
+                # We've seen some rare instances of SG returning 502 for issues that
+                # appear to be caused by something internal to SG. We're going to
+                # allow for limited retries for those specifically.
+                if attempt != max_attempts and e.errcode == 502:
+                    LOG.debug("Got a 502 response. Waiting and retrying...")
+                    time.sleep(float(attempt) * backoff)
+                    attempt += 1
+                    continue
+                elif e.errcode == 403:
+                    # 403 is returned with custom error page when api access is blocked
+                    e.errmsg += ": %s" % body
+                raise
+            else:
+                break
 
         response = self._decode_response(resp_headers, body)
         self._response_errors(response)
@@ -3421,6 +3594,18 @@ class Shotgun(object):
 
         return (http_status, resp_headers, resp_body)
 
+    def _make_upload_request(self, request, opener):
+        """
+        Open the given request object, return the
+        response, raises URLError on protocol errors.
+        """
+        try:
+            result = opener.open(request)
+
+        except urllib.error.HTTPError:
+            raise
+        return result
+
     def _parse_http_status(self, status):
         """
         Parse the status returned from the http request.
@@ -3434,7 +3619,7 @@ class Shotgun(object):
         if status[0] >= 300:
             headers = "HTTP error from server"
             if status[0] == 503:
-                errmsg = "Shotgun is currently down for maintenance or too busy to reply. Please try again later."
+                errmsg = "ShotGrid is currently down for maintenance or too busy to reply. Please try again later."
             raise ProtocolError(self.config.server,
                                 error_code,
                                 errmsg,
@@ -3520,12 +3705,12 @@ class Shotgun(object):
                 raise UserCredentialsNotAllowedForSSOAuthenticationFault(
                     sg_response.get("message",
                                     "Authentication using username/password is not "
-                                    "allowed for an SSO-enabled Shotgun site")
+                                    "allowed for an SSO-enabled ShotGrid site")
                 )
             elif sg_response.get("error_code") == ERR_OXYG:
                 raise UserCredentialsNotAllowedForOxygenAuthenticationFault(
                     sg_response.get("message", "Authentication using username/password is not "
-                                    "allowed for an Autodesk Identity enabled Shotgun site")
+                                    "allowed for an Autodesk Identity enabled ShotGrid site")
                 )
             else:
                 # raise general Fault
@@ -3882,21 +4067,40 @@ class Shotgun(object):
         :returns: upload url.
         :rtype: str
         """
-        try:
-            opener = self._build_opener(urllib.request.HTTPHandler)
+        opener = self._build_opener(urllib.request.HTTPHandler)
 
-            request = urllib.request.Request(storage_url, data=data)
-            request.add_header("Content-Type", content_type)
-            request.add_header("Content-Length", size)
-            request.get_method = lambda: "PUT"
-            result = opener.open(request)
-            etag = result.info()["Etag"]
-        except urllib.error.HTTPError as e:
-            if e.code == 500:
-                raise ShotgunError("Server encountered an internal error.\n%s\n%s\n\n" % (storage_url, e))
+        request = urllib.request.Request(storage_url, data=data)
+        request.add_header("Content-Type", content_type)
+        request.add_header("Content-Length", size)
+        request.get_method = lambda: "PUT"
+
+        attempt = 1
+        max_attempts = 4  # Three retries on failure
+        backoff = 0.75  # Seconds to wait before retry, times the attempt number
+
+        while attempt <= max_attempts:
+            try:
+                result = self._make_upload_request(request, opener)
+
+                LOG.debug("Completed request to %s" % request.get_method())
+
+            except urllib.error.HTTPError as e:
+                if e.code == 500:
+                    raise ShotgunError("Server encountered an internal error.\n%s\n%s\n\n" % (storage_url, e))
+                elif attempt != max_attempts and e.code == 503:
+                    LOG.debug("Got a 503 response. Waiting and retrying...")
+                    time.sleep(float(attempt) * backoff)
+                    attempt += 1
+                    continue
+                else:
+                    if e.code == 503:
+                        raise ShotgunError("Got a 503 response when uploading to %s: %s" % (storage_url, e))
+                    raise ShotgunError("Unanticipated error occurred uploading to %s: %s" % (storage_url, e))
+
             else:
-                raise ShotgunError("Unanticipated error occurred uploading to %s: %s" % (storage_url, e))
+                break
 
+        etag = result.info()["Etag"]
         LOG.debug("Part upload completed successfully.")
         return etag
 
