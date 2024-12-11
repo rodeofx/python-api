@@ -12,6 +12,8 @@
 import sys
 from setuptools import setup, find_packages
 
+import package
+
 f = open("README.md")
 readme = f.read().strip()
 
