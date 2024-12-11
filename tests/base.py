@@ -1,6 +1,9 @@
-"""Base class for ShotGrid API tests."""
+"""Base class for Flow Production Tracking API tests."""
+import contextlib
 import os
+import random
 import re
+import time
 import unittest
 
 from . import mock
@@ -10,12 +13,7 @@ from shotgun_api3.shotgun import json
 from shotgun_api3.shotgun import ServerCapabilities
 from shotgun_api3.lib import six
 from shotgun_api3.lib.six.moves import urllib
-
-if six.PY2:
-    from shotgun_api3.lib.six.moves.configparser import SafeConfigParser as ConfigParser
-else:
-    from shotgun_api3.lib.six.moves.configparser import ConfigParser
-
+from shotgun_api3.lib.six.moves.configparser import ConfigParser
 
 try:
     # Attempt to import skip from unittest.  Since this was added in Python 2.7
@@ -27,6 +25,11 @@ except ImportError:
     # mark them as skipped, but we will not fail on them.
     def skip(f):
         return lambda self: None
+
+
+THUMBNAIL_MAX_ATTEMPTS = 30
+THUMBNAIL_RETRY_INTERVAL = 10
+TRANSIENT_IMAGE_PATH = "images/status/transient"
 
 
 class TestBase(unittest.TestCase):
@@ -42,7 +45,6 @@ class TestBase(unittest.TestCase):
     note = None
     playlist = None
     task = None
-    ticket = None
     human_password = None
     server_url = None
     server_address = None
@@ -63,6 +65,14 @@ class TestBase(unittest.TestCase):
         cur_folder = os.path.dirname(os.path.abspath(__file__))
         config_path = os.path.join(cur_folder, "config")
         cls.config.read_config(config_path)
+        if cls.config.jenkins:
+            cls.auth_args = dict(
+                login=cls.config.human_login, password=cls.config.human_password
+            )
+        else:
+            cls.auth_args = dict(
+                script_name=cls.config.script_name, api_key=cls.config.api_key
+            )
 
     def setUp(self, auth_mode="ApiUser"):
         # When running the tests from a pull request from a client, the Shotgun
@@ -99,9 +109,8 @@ class TestBase(unittest.TestCase):
             # we can generate a session token
             sg = api.Shotgun(
                 self.config.server_url,
-                self.config.script_name,
-                self.config.api_key,
                 http_proxy=self.config.http_proxy,
+                **self.auth_args,
             )
             self.session_token = sg.get_session_token()
             # now log in using session token
@@ -130,7 +139,7 @@ class MockTestBase(TestBase):
         self._setup_mock()
         self._setup_mock_data()
 
-    def _setup_mock(self):
+    def _setup_mock(self, s3_status_code_error=503):
         """Setup mocking on the ShotgunClient to stop it calling a live server"""
         # Replace the function used to make the final call to the server
         # eaiser than mocking the http connection + response
@@ -143,7 +152,7 @@ class MockTestBase(TestBase):
             spec=api.Shotgun._make_upload_request,
             side_effect=urllib.error.HTTPError(
                 "url",
-                503,
+                s3_status_code_error,
                 "The server is currently down or to busy to reply."
                 "Please try again later.",
                 {},
@@ -164,9 +173,11 @@ class MockTestBase(TestBase):
         self.sg._server_caps = ServerCapabilities(
             self.sg.config.server, {"version": [2, 4, 0]}
         )
+        # prevent waiting for backoff
+        self.sg.BACKOFF = 0
 
     def _mock_http(self, data, headers=None, status=None):
-        """Setup a mock response from the SG server.
+        """Setup a mock response from the PTR server.
 
         Only has an affect if the server has been mocked.
         """
@@ -175,7 +186,7 @@ class MockTestBase(TestBase):
         if not isinstance(self.sg._http_request, mock.Mock):
             return
 
-        if not isinstance(data, six.string_types):
+        if not isinstance(data, str):
             if six.PY2:
                 data = json.dumps(data, ensure_ascii=False, encoding="utf-8")
             else:
@@ -206,7 +217,7 @@ class MockTestBase(TestBase):
         """Asserts _http_request is called with the method and params."""
         args, _ = self.sg._http_request.call_args
         arg_body = args[2]
-        assert isinstance(arg_body, six.binary_type)
+        assert isinstance(arg_body, bytes)
         arg_body = json.loads(arg_body)
 
         arg_params = arg_body.get("params")
@@ -231,14 +242,15 @@ class MockTestBase(TestBase):
         self.shot = {"id": 3, "code": self.config.shot_code, "type": "Shot"}
         self.asset = {"id": 4, "code": self.config.asset_code, "type": "Asset"}
         self.version = {"id": 5, "code": self.config.version_code, "type": "Version"}
-        self.ticket = {"id": 6, "title": self.config.ticket_title, "type": "Ticket"}
         self.playlist = {"id": 7, "code": self.config.playlist_code, "type": "Playlist"}
 
 
 class LiveTestBase(TestBase):
     """Test base for tests relying on connection to server."""
 
-    def setUp(self, auth_mode="ApiUser"):
+    def setUp(self, auth_mode=None):
+        if not auth_mode:
+            auth_mode = "HumanUser" if self.config.jenkins else "ApiUser"
         super(LiveTestBase, self).setUp(auth_mode)
         if (
             self.sg.server_caps.version
@@ -271,7 +283,8 @@ class LiveTestBase(TestBase):
         # site URL won't be set, so do not attempt to connect to Shotgun.
         if cls.config.server_url:
             sg = api.Shotgun(
-                cls.config.server_url, cls.config.script_name, cls.config.api_key
+                cls.config.server_url,
+                **cls.auth_args,
             )
             cls.sg_version = tuple(sg.info()["version"][:3])
             cls._setup_db(cls.config, sg)
@@ -334,15 +347,6 @@ class LiveTestBase(TestBase):
         }
         cls.task = _find_or_create_entity(sg, "Task", data, keys)
 
-        # data = {
-        # "project": cls.project,
-        # "title": cls.config.ticket_title,
-        # "sg_priority": "3",
-        # }
-        # keys = ["title", "project", "sg_priority"]
-
-        # cls.ticket = _find_or_create_entity(sg, "Ticket", data, keys)
-
         keys = ["code"]
         data = {
             "code": "api wrapper test storage",
@@ -351,6 +355,51 @@ class LiveTestBase(TestBase):
             "linux_path": "nowhere",
         }
         cls.local_storage = _find_or_create_entity(sg, "LocalStorage", data, keys)
+
+    @contextlib.contextmanager
+    def gen_entity(self, entity_type, **kwargs):
+        # Helper creator
+        if entity_type == "HumanUser":
+            if "login" not in kwargs:
+                kwargs["login"] = "test-python-api-{rnd}"
+
+            if "sg_status_list" not in kwargs:
+                kwargs["sg_status_list"] = "dis"
+
+            if "password_proxy" not in kwargs:
+                kwargs["password_proxy"] = self.config.human_password
+
+        item_rnd = random.randrange(100, 999)
+        for k in kwargs:
+            if isinstance(kwargs[k], str):
+                kwargs[k] = kwargs[k].format(rnd=item_rnd)
+
+        entity = self.sg.create(entity_type, kwargs, return_fields=list(kwargs.keys()))
+        try:
+            yield entity
+        finally:
+            rv = self.sg.delete(entity_type, entity["id"])
+            assert rv == True
+
+    def find_one_await_thumbnail(
+        self,
+        entity_type,
+        filters,
+        fields=["image"],
+        thumbnail_field_name="image",
+        **kwargs
+    ):
+        attempts = 0
+        while attempts < THUMBNAIL_MAX_ATTEMPTS:
+            result = self.sg.find_one(entity_type, filters, fields=fields, **kwargs)
+            if TRANSIENT_IMAGE_PATH in result.get(thumbnail_field_name, ""):
+                return result
+
+            time.sleep(THUMBNAIL_RETRY_INTERVAL)
+            attempts += 1
+        else:
+            if self.config.jenkins:
+                self.skipTest("Jenkins test timed out waiting for thumbnail")
 
 
 class HumanUserAuthLiveTestBase(LiveTestBase):
@@ -402,7 +451,7 @@ class SgTestConfig(object):
             "task_content",
             "version_code",
             "playlist_code",
-            "ticket_title",
+            "jenkins",
         ]
 
     def read_config(self, config_path):
