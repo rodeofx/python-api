@@ -17,7 +17,7 @@ import os
 import re
 
 from shotgun_api3.lib.six.moves import urllib
-from shotgun_api3.lib import six
+from shotgun_api3.lib import six, sgutils
 try:
     import simplejson as json
 except ImportError:
@@ -44,7 +44,7 @@ else:
 
 
 def b64encode(val):
-    return base64encode(six.ensure_binary(val)).decode("utf-8")
+    return base64encode(sgutils.ensure_binary(val)).decode("utf-8")
 
 
 class TestShotgunClient(base.MockTestBase):
@@ -244,7 +244,7 @@ class TestShotgunClient(base.MockTestBase):
         self.assertEqual(expected, headers.get("Authorization"))
 
     def test_localization_header_default(self):
-        """Localization header not passed to server without explicitly setting SG localization config to True"""
+        """Localization header not passed to server without explicitly setting PTR localization config to True"""
         self.sg.info()
 
         args, _ = self.sg._http_request.call_args
@@ -254,7 +254,7 @@ class TestShotgunClient(base.MockTestBase):
         self.assertEqual(None, headers.get("locale"))
 
     def test_localization_header_when_localized(self):
-        """Localization header passed to server when setting SG localization config to True"""
+        """Localization header passed to server when setting PTR localization config to True"""
         self.sg.config.localized = True
 
         self.sg.info()
@@ -424,20 +424,37 @@ class TestShotgunClient(base.MockTestBase):
 
         # Test unicode mixed with utf-8 as reported in Ticket #17959
         d = {"results": ["foo", "bar"]}
-        a = {"utf_str": "\xe2\x88\x9a", "unicode_str": six.ensure_text("\xe2\x88\x9a")}
+        a = {"utf_str": "\xe2\x88\x9a", "unicode_str": sgutils.ensure_text("\xe2\x88\x9a")}
         self._mock_http(d)
         rv = self.sg._call_rpc("list", a)
         expected = "rpc response with list result"
         self.assertEqual(d["results"], rv, expected)
 
-        # Test that we raise on a 502. This is ensuring the retries behavior
-        # in place specific to 502 responses still eventually ends up raising.
+        # Test that we raise on a 5xx. This is ensuring the retries behavior
+        # in place specific to 5xx responses still eventually ends up raising.
+        # 502
         d = {"results": ["foo", "bar"]}
         a = {"some": "args"}
         self._mock_http(d, status=(502, "bad gateway"))
         self.assertRaises(api.ProtocolError, self.sg._call_rpc, "list", a)
+        self.assertEqual(
+            self.sg.MAX_ATTEMPTS,
+            self.sg._http_request.call_count,
+            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times",
+        )
 
-    def test_upload_s3(self):
+        # 504
+        d = {"results": ["foo", "bar"]}
+        a = {"some": "args"}
+        self._mock_http(d, status=(504, "gateway timeout"))
+        self.assertRaises(api.ProtocolError, self.sg._call_rpc, "list", a)
+        self.assertEqual(
+            self.sg.MAX_ATTEMPTS,
+            self.sg._http_request.call_count,
+            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times",
+        )
+
+    def test_upload_s3_503(self):
         """
         Test 503 response is retried when uploading to S3.
         """
@@ -445,7 +462,6 @@ class TestShotgunClient(base.MockTestBase):
         storage_url = "http://foo.com/"
         path = os.path.abspath(os.path.expanduser(
             os.path.join(this_dir, "sg_logo.jpg")))
-        max_attempts = 4  # Max retries to S3 server attempts
         # Expected HTTPError exception error message
         expected = "The server is currently down or to busy to reply." \
                    "Please try again later."
@@ -457,8 +473,93 @@ class TestShotgunClient(base.MockTestBase):
             self.sg._upload_file_to_storage(path, storage_url)
         # Test the max retries attempt
         self.assertTrue(
-            max_attempts == self.sg._make_upload_request.call_count,
-            "Call is repeated up to 3 times")
+            self.sg.MAX_ATTEMPTS == self.sg._make_upload_request.call_count,
+            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times")
+    
+    def test_upload_s3_500(self):
+        """
+        Test 500 response is retried when uploading to S3.
+        """
+        self._setup_mock(s3_status_code_error=500)
+        this_dir, _ = os.path.split(__file__)
+        storage_url = "http://foo.com/"
+        path = os.path.abspath(os.path.expanduser(
+            os.path.join(this_dir, "sg_logo.jpg")))
+        # Expected HTTPError exception error message
+        expected = "The server is currently down or to busy to reply." \
+                   "Please try again later."
+
+        # Test the Internal function that is used to upload each
+        # data part in the context of multi-part uploads to S3, we
+        # simulate the HTTPError exception raised with 503 status errors
+        with self.assertRaises(api.ShotgunError, msg=expected):
+            self.sg._upload_file_to_storage(path, storage_url)
+        # Test the max retries attempt
+        self.assertTrue(
+            self.sg.MAX_ATTEMPTS == self.sg._make_upload_request.call_count,
+            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times")
+    
+    def test_upload_s3_urlerror__get_attachment_upload_info(self):
+        """
+        Test URLError response is retried when invoking _send_form
+        """
+        mock_opener = mock.Mock()
+        mock_opener.return_value.open.side_effect = urllib.error.URLError(
+            "[WinError 10054] An existing connection was forcibly closed by the remote host"
+        )
+        self.sg._build_opener = mock_opener
+        this_dir, _ = os.path.split(__file__)
+        path = os.path.abspath(
+            os.path.expanduser(os.path.join(this_dir, "sg_logo.jpg"))
+        )
+
+        with self.assertRaises(api.ShotgunError) as cm:
+            self.sg._get_attachment_upload_info(False, path, False)
+
+        # Test the max retries attempt
+        self.assertEqual(
+            self.sg.MAX_ATTEMPTS,
+            mock_opener.return_value.open.call_count,
+            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times"
+        )
+
+        # Test the exception message
+        the_exception = cm.exception
+        self.assertEqual(str(the_exception), "Max attemps limit reached.")
+
+    def test_upload_s3_urlerror__upload_to_storage(self):
+        """
+        Test URLError response is retried when uploading to S3.
+        """
+        self.sg._make_upload_request = mock.Mock(
+            spec=api.Shotgun._make_upload_request,
+            side_effect=urllib.error.URLError(
+                "[Errno 104] Connection reset by peer",
+            ),
+        )
+
+        this_dir, _ = os.path.split(__file__)
+        storage_url = "http://foo.com/"
+        path = os.path.abspath(
+            os.path.expanduser(os.path.join(this_dir, "sg_logo.jpg"))
+        )
+
+        # Test the Internal function that is used to upload each
+        # data part in the context of multi-part uploads to S3, we
+        # simulate the HTTPError exception raised with 503 status errors
+        with self.assertRaises(api.ShotgunError) as cm:
+            self.sg._upload_file_to_storage(path, storage_url)
+
+        # Test the max retries attempt
+        self.assertEqual(
+            self.sg.MAX_ATTEMPTS,
+            self.sg._make_upload_request.call_count,
+            f"Call is repeated up to {self.sg.MAX_ATTEMPTS} times"
+        )
+
+        # Test the exception message
+        the_exception = cm.exception
+        self.assertEqual(str(the_exception), "Max attemps limit reached.")
 
     def test_transform_data(self):
         """Outbound data is transformed"""
@@ -484,14 +585,14 @@ class TestShotgunClient(base.MockTestBase):
             return datetime.datetime(*time.strptime(s, f)[:6])
 
         def assert_wire(wire, match):
-            self.assertTrue(isinstance(wire["date"], six.string_types))
+            self.assertTrue(isinstance(wire["date"], str))
             d = _datetime(wire["date"], "%Y-%m-%d").date()
             d = wire['date']
             self.assertEqual(match["date"], d)
-            self.assertTrue(isinstance(wire["datetime"], six.string_types))
+            self.assertTrue(isinstance(wire["datetime"], str))
             d = _datetime(wire["datetime"], "%Y-%m-%dT%H:%M:%SZ")
             self.assertEqual(match["datetime"], d)
-            self.assertTrue(isinstance(wire["time"], six.string_types))
+            self.assertTrue(isinstance(wire["time"], str))
             d = _datetime(wire["time"], "%Y-%m-%dT%H:%M:%SZ")
             self.assertEqual(match["time"], d.time())
 
@@ -520,16 +621,16 @@ class TestShotgunClient(base.MockTestBase):
 
         d = {"this is ": u"my data \u00E0"}
         j = self.sg._encode_payload(d)
-        self.assertTrue(isinstance(j, six.binary_type))
+        self.assertTrue(isinstance(j, bytes))
 
         d = {
             "this is ": u"my data"
         }
         j = self.sg._encode_payload(d)
-        self.assertTrue(isinstance(j, six.binary_type))
+        self.assertTrue(isinstance(j, bytes))
 
     def test_decode_response_ascii(self):
-        self._assert_decode_resonse(True, six.ensure_str(u"my data \u00E0", encoding='utf8'))
+        self._assert_decode_resonse(True, sgutils.ensure_str(u"my data \u00E0", encoding='utf8'))
 
     def test_decode_response_unicode(self):
         self._assert_decode_resonse(False, u"my data \u00E0")
@@ -564,7 +665,6 @@ class TestShotgunClient(base.MockTestBase):
         system = platform.system().lower()
         if system == 'darwin':
             local_path_field = "local_path_mac"
-        # python 2.4 returns 'Microsoft'
         elif system in ['windows', 'microsoft']:
             local_path_field = "local_path_windows"
         elif system == 'linux':

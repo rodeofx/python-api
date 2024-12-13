@@ -1,8 +1,91 @@
-*****************************
-ShotGrid Python API Changelog
-*****************************
+*********************************************
+Flow Production Tracking Python API Changelog
+*********************************************
 
 Here you can see the full list of changes between each Python API release.
+
+v3.7.0 (2024 Dec 9)
+===========================
+- Remove unnecessary data in the payload when combining related queries before sending it to the server.
+  This would improve overall performance decreasing network latency and server processing.
+  See documentation for more information.
+
+
+v3.6.2 (2024 Aug 13)
+====================
+- Remove Ticket entity reference and prepare this to run in CI.
+- Condition auth for Jenkins environment.
+- Update certifi to 2024.7.4.
+- FIRST PHASE Python2 removing.
+
+v3.6.1 (2024 Jun 6)
+===================
+- Adds multi_entity_update_modes support to mockgun ``update()`` and ``batch()`` methods.
+- Implements a retry strategy only when encountering an URLError or SSLEOFError.
+- Fixes the issue with deleting prefix and suffix for ``display_name`` variable at the moment of upload for a local install.
+- Clarifies the use of ``_build_opener`` in ``download_attachment()``.
+
+v3.6.0 (2024 May 1)
+===================
+- Drop support for Python 2.7
+- certifi version changed to 2024.2.2
+- Documentation update
+
+v3.5.1 (2024 Apr 3)
+===================
+- Documentation: Revert to Shotgun in the API Reference headers to keep consistency with the API methods
+- Mockgun: fix entity data type
+- Mockgun: add support for ``add_user_agent`` and ``set_session_uuid`` methods
+
+v3.5.0 (2024 Mar 26)
+===================
+- Rebranding component for Flow Production Tracking
+
+v3.4.2 (2024 Feb 6)
+===================
+- Add support for Python 3.11
+
+v3.4.1 (2024 Jan 29)
+====================
+- Flaky Tests
+- Documentation: Fix issue regarding "in" filter prototype 
+- Documentation: Travis badge image is no working anymore
+- Documentation: Add ``user_subscription_read`` and ``user_subscription_create`` methods
+- Update Python Certifi license block
+- Add methods for the user_subscriptions API end points
+- Retry ShotGrid request also on error 504
+- Retry S3 uploads on error 500
+- Comment typing annotation breaks Python 2 compatibility
+- Add field type ``entity_type`` to mockgun
+
+
+v3.4.0 (2023 Sep 22)
+====================
+- Started support for Python 3.10 for CI.
+- Add documentation for PublishedFiles preset filters.
+- Upgrade httplib2 to 0.22.0.
+- Update licensing.
+- Updates Autodesk URLs.
+- Fix flaky tests.
+
+v3.3.6 (2023 Aug 29)
+====================
+- Update docs for entity fields.
+- Fix typo.
+- Fix incorrect hint.
+- Reformat code examples to prevent text overflow.
+- Bump certifi from 2020.06.20 to 2022.12.7 in /shotgun_api3/lib.
+- Skip SG-MIM entities.
+- Replace shotgunsoftware references.
+- Deprecation of Python 2.
+- Security upgrade certifi to latest version 2023.07.22.
+
+v3.3.5 (2023 Jan 5)
+====================
+- Add "Setting Up Your Environment with the Python API" to Python Docs (python-api docs).
+- [Python API Documentation] Update Python version requirements.
+- Rename Shotgun to Shotgrid in every about text like tk-multi-demo git repository.
+- Rename Shotgun servers to ShotGrid servers in the documentation.
 
 v3.3.4 (2022 June 9)
 ====================
@@ -127,7 +210,7 @@ v3.0.32 (2016 Sep 22)
 
 - Optimized import speed of the API on Python 2.7.
 - Integrated the latest fixes to the ``mimetypes`` module.
-- Added ``nav_expand()`` method as an experimental, internal method for querying SG hierarchy. 
+- Added ``nav_expand()`` method as an experimental, internal method for querying SG hierarchy.
 - Ported all documentation to sphinx. See http://developer.shotgridsoftware.com/python-api.
 - Moved Changelog to dedicated HISTORY file.
 
@@ -175,7 +258,7 @@ v3.0.25 (2016 Jan 12)
 =====================
 
 - Add handling for Python versions incompatible with SHA-2 (see `this blog post 
-  <http://blog.shotgunsoftware.com/2016/01/important-ssl-certificate-renewal-and.html>`_).
+  <https://www.shotgridsoftware.com/blog/important-ssl-certificate-renewal-and-sha-2/>`_).
 - Add ``SHOTGUN_FORCE_CERTIFICATE_VALIDATION`` environment variable to prevent disabling certficate 
   validation when SHA-2 validation is not available.
 - Add SSL info to user-agent header.
